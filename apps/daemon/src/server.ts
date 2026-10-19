@@ -35,6 +35,7 @@ import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
+import { summarizeDiff } from "./summary-ai.ts";
 import { openPanel } from "./panel.ts";
 import { findSymbols, readSource } from "./symbols.ts";
 
@@ -293,10 +294,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "GET" && rest === "diff") {
       const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId);
       const args = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId);
-      const summarized = [];
-      for (const file of files) {
-        summarized.push({ ...file, summary: await fileSummary(repo.path, args, file) });
-      }
+      const summarized = await Promise.all(
+        files.map(async (file) => ({ ...file, summary: await fileSummary(repo.path, args, file) })),
+      );
       sendJson(res, 200, { scope, files: summarized });
       return;
     }
@@ -369,7 +369,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (file.binary) return summarizeFile(file, "");
     try {
       const text = await git(cwd, ["diff", "-U3", "--find-renames", ...diffArgs, "--", file.path]);
-      return summarizeFile(file, text);
+      return summarizeDiff(file, text);
     } catch {
       return summarizeFile(file, "");
     }
