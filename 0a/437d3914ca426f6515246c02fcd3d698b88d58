@@ -1,0 +1,21 @@
+mac/代码评审.app/Contents/MacOS/launch
+  s_5f3d8f56fde9b6::t_e4f984dd2ebf2c 2-8
+mac/install.sh
+  s_5f3d8f56fde9b6::t_1e3cd2c33b6cc4 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0a437d3914ca426f6515246c02fcd3d698b88d58",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
