@@ -186,6 +186,7 @@ function renderSummary(gate) {
   const round = $("round-label");
   round.hidden = gate.finalRound !== true && gate.finalRound !== false;
   round.textContent = gate.finalRound === true ? "最后一轮" : gate.finalRound === false ? "不是最后一轮" : "";
+  round.classList.toggle("final", gate.finalRound === true);
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
   decisions.replaceChildren();
