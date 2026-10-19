@@ -16,7 +16,7 @@ function ensurePanelBinary(): void {
   if (!existsSync(source)) return;
   const stale = !existsSync(binary) || statSync(source).mtimeMs > statSync(binary).mtimeMs;
   if (!stale) return;
-  execFileSync("swiftc", ["-O", "-framework", "Cocoa", "-framework", "WebKit", "-o", binary, source], {
+  execFileSync("swiftc", ["-framework", "Cocoa", "-framework", "WebKit", "-o", binary, source], {
     stdio: "ignore",
   });
 }

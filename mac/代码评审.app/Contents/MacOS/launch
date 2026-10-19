@@ -45,7 +45,7 @@ if [[ -z "$url" ]]; then
 fi
 
 if [[ ! -x "$PANEL" || "$SOURCE" -nt "$PANEL" ]]; then
-  swiftc -O -framework Cocoa -framework WebKit -o "$PANEL" "$SOURCE" || exit 1
+  swiftc -framework Cocoa -framework WebKit -o "$PANEL" "$SOURCE" || exit 1
 fi
 
 exec "$PANEL" "$url"
