@@ -1,5 +1,4 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
@@ -33,6 +32,7 @@ import {
   writeDaemonInfo,
 } from "./session/store.ts";
 import { chooseFolder } from "./pick-folder.ts";
+import { openPanel } from "./panel.ts";
 import { findSymbols, readSource } from "./symbols.ts";
 
 type SocketClient = { send: (text: string) => void };
@@ -102,7 +102,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   const port = typeof address === "object" && address ? address.port : 0;
   writeDaemonInfo({ pid: process.pid, port, token });
   const url = `http://127.0.0.1:${port}/`;
-  if (options.open) spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+  if (options.open) openPanel(url);
 
   async function onRepoChange(): Promise<void> {
     if (stopped) return;
