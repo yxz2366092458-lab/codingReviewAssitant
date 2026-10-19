@@ -44,6 +44,7 @@ button.decision { min-width: 96px; }
 .top { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: var(--panel); }
 .project-switch { display: flex; gap: 8px; align-items: center; }
 .project-switch select,
+#branch-select,
 .project-switch input {
   border: 1px solid var(--line);
   background: var(--bg);

@@ -31,6 +31,7 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
+import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
@@ -206,6 +207,20 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const status = await repoStatus(repo.path, repo.base_ref);
       const view = gateView(db, repo.id);
       sendJson(res, 200, { ...status, baseRef: repo.base_ref, gate: view.state, lease: view.lease });
+      return;
+    }
+    if (req.method === "GET" && rest === "branches") {
+      sendJson(res, 200, { branches: await listLocalBranches(repo.path) });
+      return;
+    }
+    if (req.method === "POST" && rest === "branch") {
+      const body = await readJson(req);
+      const view = gateView(db, repo.id);
+      if (view.state !== "locked") throw new GateError(409, "评审进行中，不能切换分支");
+      await checkoutBranch(repo.path, String(body.branch ?? ""));
+      publish(repo.id);
+      const status = await repoStatus(repo.path, repo.base_ref);
+      sendJson(res, 200, { branch: status.branch });
       return;
     }
     if (req.method === "POST" && rest === "base") {

@@ -51,6 +51,14 @@ async function bootRepo() {
   });
   $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
+  $("branch-select").addEventListener("change", () => {
+    void switchBranch().catch(async (error) => {
+      showError(error);
+      state.signature = "";
+      $("branch-select").dataset.signature = "";
+      await refresh().catch(showError);
+    });
+  });
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -71,6 +79,36 @@ function repoLabel(repo, repos) {
   if (same.length < 2) return name;
   const parts = repo.path.split("/").filter(Boolean);
   return parts.slice(-2).join("/");
+}
+
+function renderBranches(status, names) {
+  $("base-ref").textContent = status.baseRef ? `${status.baseRef}...` : "";
+  const select = $("branch-select");
+  const branches = names.length ? names : status.branch ? [status.branch] : [];
+  const signature = `${branches.join("\n")}\0${status.branch}`;
+  if (select.dataset.signature === signature) return;
+  select.dataset.signature = signature;
+  select.replaceChildren();
+  for (const name of branches) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    option.selected = name === status.branch;
+    select.append(option);
+  }
+}
+
+async function switchBranch() {
+  const branch = $("branch-select").value;
+  try {
+    await api(`/repos/${state.repoId}/branch`, { method: "POST", body: JSON.stringify({ branch }) });
+  } catch (error) {
+    $("branch-select").dataset.signature = "";
+    throw error;
+  }
+  state.signature = "";
+  $("branch-select").dataset.signature = "";
+  await refresh();
 }
 
 function renderRepoSelect() {
@@ -141,11 +179,12 @@ function connect() {
 }
 
 async function refresh() {
-  const [status, gate, diff, slices] = await Promise.all([
+  const [status, gate, diff, slices, branchList] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
     api(`/repos/${state.repoId}/gate`),
     api(`/repos/${state.repoId}/diff?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`),
     api(`/repos/${state.repoId}/slices`),
+    api(`/repos/${state.repoId}/branches`),
   ]);
   const signature = JSON.stringify({
     gate: gate.state,
@@ -155,13 +194,14 @@ async function refresh() {
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
+    branch: status.branch,
     fileId: state.fileId,
     symbol: state.symbol,
     locations: state.locations.map((item) => `${item.path}:${item.line}`),
   });
   if (signature === state.signature) return;
   state.signature = signature;
-  $("branch").textContent = `${status.baseRef}...${status.branch}`;
+  renderBranches(status, branchList.branches ?? []);
   $("gate-label").textContent = gate.lease === "revert" ? "待撤回" : labels[gate.state];
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
