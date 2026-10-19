@@ -1,8 +1,13 @@
 #!/bin/bash
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+MACOS="$(cd "$(dirname "$0")" && pwd)"
+ROOT_FILE="$MACOS/../Resources/repo-root"
+if [[ -f "$ROOT_FILE" ]]; then
+  ROOT="$(tr -d '\n' < "$ROOT_FILE")"
+else
+  ROOT="$(cd "$MACOS/../../../.." && pwd)"
+fi
 cd "$ROOT" || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH"
-MACOS="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$ROOT/apps/mac/Panel.swift"
 PANEL="$MACOS/panel"
 INFO="$HOME/Library/Application Support/CodingReviewAssistant/daemon.json"
