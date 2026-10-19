@@ -7,6 +7,7 @@ const state = {
   symbol: null,
   identifier: "",
   fileId: "",
+  files: [],
   sliceId: "",
   locations: [],
   source: "",
@@ -150,7 +151,7 @@ async function refresh() {
     gate: gate.state,
     lease: gate.lease,
     purpose: gate.slice?.purpose,
-    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}`),
+    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
     fileId: state.fileId,
@@ -164,6 +165,7 @@ async function refresh() {
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
   });
+  state.files = diff.files ?? [];
   renderSummary(gate);
   renderFiles(diff.files ?? []);
   renderHistory(slices);
@@ -172,7 +174,7 @@ async function refresh() {
   else {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
-    $("file-head").textContent = gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "";
+    showFileHead(gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "", "");
   }
 }
 
@@ -218,6 +220,13 @@ async function act(name, sliceId) {
   await refresh();
 }
 
+function showFileHead(pathText, summary) {
+  $("file-path").textContent = pathText;
+  const node = $("file-summary");
+  node.hidden = !summary;
+  node.textContent = summary;
+}
+
 function renderFiles(files) {
   const aside = $("files");
   aside.replaceChildren();
@@ -248,7 +257,8 @@ function renderFiles(files) {
 
 async function renderPatch() {
   const patch = await api(`/repos/${state.repoId}/files/${state.fileId}/patch?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`);
-  $("file-head").textContent = patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path;
+  const file = state.files.find((item) => item.fileId === state.fileId);
+  showFileHead(patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path, file?.summary ?? "");
   renderViewbar();
   const diff = $("diff");
   diff.replaceChildren();

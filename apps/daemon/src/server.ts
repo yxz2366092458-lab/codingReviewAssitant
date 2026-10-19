@@ -32,6 +32,7 @@ import {
   writeDaemonInfo,
 } from "./session/store.ts";
 import { chooseFolder } from "./pick-folder.ts";
+import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
 import { findSymbols, readSource } from "./symbols.ts";
 
@@ -269,7 +270,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "diff") {
-      sendJson(res, 200, { scope, files: await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId) });
+      const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId);
+      sendJson(res, 200, { scope, files: files.map((file) => ({ ...file, summary: summarizeFile(file) })) });
       return;
     }
     const patchMatch = /^files\/([^/]+)\/patch$/.exec(rest);
