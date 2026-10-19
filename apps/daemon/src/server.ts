@@ -232,6 +232,10 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       await waitFor(req, res, repo.id, sliceId);
       return;
     }
+    if (req.method === "GET" && rest === "gate/settle") {
+      await settleFor(req, res, sliceId);
+      return;
+    }
     if (req.method === "POST" && rest === "gate/release") {
       const body = await readJson(req);
       publishAfter(repo.id, await release(db, repo.path, String(body.sliceId ?? "")));
@@ -255,7 +259,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "POST" && rest === "gate/complete") {
       await complete(db, repo.path, repo.id);
       publish(repo.id);
-      sendJson(res, 200, gateView(db, repo.id));
+      sendJson(res, 200, present(gateView(db, repo.id)));
       return;
     }
     if (req.method === "POST" && rest === "gate/check") {
@@ -379,6 +383,27 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         if (!finished) return;
         clearInterval(timer);
         sendJson(res, 200, view.slice ? view : { state: "locked", lease: null, slice: row ? toSlice(row) : null });
+        done();
+      }, 300);
+      req.on("close", () => {
+        clearInterval(timer);
+        done();
+      });
+    });
+  }
+
+  function settleFor(req: IncomingMessage, res: ServerResponse, sliceId: string | null): Promise<void> {
+    const send = () => {
+      const row = sliceId ? findSlice(db, sliceId) : null;
+      if (!row || (row.state !== "approved" && row.state !== "rejected")) return false;
+      sendJson(res, 200, { state: row.state, finalRound: readFinalRound(db, row.id) });
+      return true;
+    };
+    if (send()) return Promise.resolve();
+    return new Promise((done) => {
+      const timer = setInterval(() => {
+        if (!send()) return;
+        clearInterval(timer);
         done();
       }, 300);
       req.on("close", () => {

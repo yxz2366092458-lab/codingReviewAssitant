@@ -50,7 +50,15 @@ if (command === "wait") {
 if (command === "complete") {
   const view = await call("POST", `/repos/${await repoId()}/gate/complete`, {});
   process.stdout.write(`${view.state}\n`);
-  process.exit(0);
+  if (view.finalRound === true || !view.slice?.sliceId) process.exit(0);
+  const settled = await callOptional("GET", `/repos/${await repoId()}/gate/settle?sliceId=${view.slice.sliceId}`);
+  if (!settled) process.exit(0);
+  if (settled.state === "approved") {
+    process.stdout.write("继续下一轮\n");
+    process.exit(0);
+  }
+  process.stdout.write(`${settled.state}\n`);
+  process.exit(1);
 }
 
 process.stderr.write("用法：review-gate intend \"作用\" [--final] | wait | complete | check-tool\n");
@@ -67,6 +75,20 @@ async function call(method, path, body) {
     headers: { authorization: `Bearer ${info.token}`, "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  const payload = await response.json();
+  if (!response.ok) {
+    process.stderr.write(`${payload.error ?? "请求失败"}\n`);
+    process.exit(1);
+  }
+  return payload;
+}
+
+async function callOptional(method, path) {
+  const response = await fetch(`http://127.0.0.1:${info.port}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${info.token}`, "content-type": "application/json" },
+  });
+  if (response.status === 404) return null;
   const payload = await response.json();
   if (!response.ok) {
     process.stderr.write(`${payload.error ?? "请求失败"}\n`);
