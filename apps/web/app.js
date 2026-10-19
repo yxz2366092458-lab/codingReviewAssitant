@@ -151,6 +151,7 @@ async function refresh() {
     gate: gate.state,
     lease: gate.lease,
     purpose: gate.slice?.purpose,
+    finalRound: gate.finalRound,
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
@@ -182,6 +183,9 @@ function renderSummary(gate) {
   const slice = gate.slice;
   $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
   $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";
+  const round = $("round-label");
+  round.hidden = gate.finalRound !== true && gate.finalRound !== false;
+  round.textContent = gate.finalRound === true ? "最后一轮" : gate.finalRound === false ? "不是最后一轮" : "";
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
   decisions.replaceChildren();

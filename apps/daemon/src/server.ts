@@ -32,6 +32,7 @@ import {
   writeDaemonInfo,
 } from "./session/store.ts";
 import { chooseFolder } from "./pick-folder.ts";
+import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
 import { findSymbols, readSource } from "./symbols.ts";
@@ -216,14 +217,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "gate") {
-      sendJson(res, 200, gateView(db, repo.id));
+      sendJson(res, 200, present(gateView(db, repo.id)));
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {
       const body = await readJson(req);
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
+      if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
       publish(repo.id);
-      sendJson(res, 200, view);
+      sendJson(res, 200, present(view));
       return;
     }
     if (req.method === "GET" && rest === "gate/wait") {
@@ -299,6 +301,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     sendJson(res, 404, { error: "没有这个地址" });
+  }
+
+  function present(view: ReturnType<typeof gateView>) {
+    const sliceId = view.slice?.sliceId ?? null;
+    return { ...view, finalRound: sliceId ? readFinalRound(db, sliceId) : null };
   }
 
   async function registerRepo(inputPath: string): Promise<{ repoId: string; branch: string; baseRef: string }> {

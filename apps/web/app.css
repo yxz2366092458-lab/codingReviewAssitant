@@ -56,6 +56,7 @@ button.decision { min-width: 96px; }
 .muted, .kicker { color: var(--muted); }
 .kicker { font-size: 12px; margin: 12px 0 6px; }
 h1 { font-size: 22px; line-height: 1.4; margin: 0; font-weight: 600; }
+.round-label { margin: 8px 0 0; font-weight: 650; }
 h2 { font-size: 16px; margin: 0 0 8px; }
 .state { font-weight: 650; }
 .banner { background: var(--fill); padding: 8px 10px; }
