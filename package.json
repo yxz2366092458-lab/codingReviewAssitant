@@ -1,0 +1,10 @@
+{
+  "name": "coding-review-assistant",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "start": "node --experimental-strip-types apps/daemon/src/index.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  }
+}
