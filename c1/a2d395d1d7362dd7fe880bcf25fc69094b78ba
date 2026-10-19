@@ -1,0 +1,24 @@
+apps/cli/review-gate.ts
+  s_5f3d8f56fde9b6::t_1e796832b27b3a 86-99
+  s_5f3d8f56fde9b6::t_b64a45ad81bbab 53-61
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_7feed2ff3fef12 262
+  s_5f3d8f56fde9b6::t_0850d6e90307d0 235-238
+  s_5f3d8f56fde9b6::t_8c4199c2f87bb9 395-415
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c1a2d395d1d7362dd7fe880bcf25fc69094b78ba",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
