@@ -1,0 +1,21 @@
+package.json
+  s_621a90e46905cc::t_5dc070ef1b321a 1-10
+packages/protocol/src/index.ts
+  s_621a90e46905cc::t_e7347d99992113 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "90c6ed3b35f6ffee3ca71b77b45e3099b6d574d0",
+  "prompts": {},
+  "sessions": {
+    "s_621a90e46905cc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "65f78ad0-148c-4c4a-8b58-c6b836e2d1cb",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
