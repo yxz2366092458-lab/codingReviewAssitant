@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>代码评审</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="project-switch">
+        <label class="muted" for="repo-select">工程</label>
+        <select id="repo-select"></select>
+        <input id="repo-path" type="text" placeholder="登记路径" spellcheck="false" />
+        <button type="button" id="register-repo">登记</button>
+      </div>
+      <div>
+        <strong id="repo-name">代码评审</strong>
+        <span id="branch" class="muted"></span>
+      </div>
+      <span id="gate-label" class="state"></span>
+      <div class="top-actions">
+        <button type="button" data-scope="slice">本段</button>
+        <button type="button" data-scope="branch">分支</button>
+        <button type="button" id="install">安装门禁</button>
+      </div>
+    </header>
+    <p id="notice" class="notice" hidden></p>
+    <section class="summary">
+      <p id="meta" class="muted"></p>
+      <h1 id="purpose">等待 Agent 登记这一小段的作用。</h1>
+      <div id="decision-wrap">
+        <p class="kicker">结论</p>
+        <div id="decisions" class="row"></div>
+      </div>
+      <p id="banner" class="banner" hidden></p>
+    </section>
+    <div class="workspace">
+      <aside id="files"></aside>
+      <section class="diff-pane">
+        <div id="file-head" class="file-head"></div>
+        <div id="viewbar"></div>
+        <div id="locations"></div>
+        <div id="diff"></div>
+        <pre id="source" class="source" hidden></pre>
+      </section>
+    </div>
+    <section class="history">
+      <h2>工作记录</h2>
+      <table>
+        <thead>
+          <tr><th>时间</th><th>作用说明</th><th>结果</th></tr>
+        </thead>
+        <tbody id="history"></tbody>
+      </table>
+    </section>
+    <p id="error" class="error" hidden></p>
+    <script>/*__BOOT__*/</script>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,497 @@
+const boot = window.__REVIEW__;
+const state = {
+  repoId: "",
+  repos: [],
+  scope: "slice",
+  mode: "unified",
+  symbol: null,
+  identifier: "",
+  fileId: "",
+  sliceId: "",
+  locations: [],
+  source: "",
+  signature: "",
+};
+
+let events = null;
+
+const labels = {
+  locked: "锁定",
+  awaiting_release: "待放行",
+  editing: "编辑中",
+  awaiting_review: "待核对",
+  approved: "核对通过",
+  rejected: "退回",
+};
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      authorization: `Bearer ${boot.token}`,
+      "content-type": "application/json",
+      ...(options.headers ?? {}),
+    },
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "请求失败");
+  return body;
+}
+
+async function bootRepo() {
+  const repo = await api("/repos", { method: "POST", body: JSON.stringify({ path: boot.repoPath }) });
+  state.repoId = repo.repoId;
+  state.repos = await api("/repos");
+  renderRepoSelect();
+  $("repo-select").addEventListener("change", () => {
+    void switchRepo($("repo-select").value).catch(showError);
+  });
+  $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
+  $("repo-path").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void registerRepo().catch(showError);
+  });
+  connect();
+  await refresh();
+  setInterval(() => void refresh().catch(showError), 1500);
+}
+
+function folderName(repoPath) {
+  return repoPath.split("/").filter(Boolean).pop() || repoPath;
+}
+
+function repoLabel(repo, repos) {
+  const name = folderName(repo.path);
+  const same = repos.filter((item) => folderName(item.path) === name);
+  if (same.length < 2) return name;
+  const parts = repo.path.split("/").filter(Boolean);
+  return parts.slice(-2).join("/");
+}
+
+function renderRepoSelect() {
+  const select = $("repo-select");
+  select.replaceChildren();
+  for (const repo of state.repos) {
+    const option = document.createElement("option");
+    option.value = repo.id;
+    option.textContent = repoLabel(repo, state.repos);
+    option.title = repo.path;
+    select.append(option);
+  }
+  select.value = state.repoId;
+  const current = state.repos.find((repo) => repo.id === state.repoId);
+  $("repo-name").textContent = current ? folderName(current.path) : "代码评审";
+}
+
+async function registerRepo() {
+  const path = $("repo-path").value.trim();
+  if (!path) {
+    showNotice("请填写要登记的工程路径。");
+    return;
+  }
+  const registered = await api("/repos", { method: "POST", body: JSON.stringify({ path }) });
+  $("repo-path").value = "";
+  state.repos = await api("/repos");
+  const same = registered.repoId === state.repoId;
+  state.repoId = registered.repoId;
+  renderRepoSelect();
+  if (!same) resetView();
+  await refresh();
+  showNotice("工程已登记，当前查看这一项。");
+}
+
+async function switchRepo(repoId) {
+  if (!repoId || repoId === state.repoId) return;
+  state.repoId = repoId;
+  resetView();
+  renderRepoSelect();
+  await refresh();
+}
+
+function resetView() {
+  state.fileId = "";
+  state.sliceId = "";
+  state.signature = "";
+  state.locations = [];
+  state.source = "";
+  $("source").hidden = true;
+  $("diff").replaceChildren();
+  connect();
+}
+
+function connect() {
+  if (events) {
+    events.onmessage = null;
+    events.close();
+  }
+  events = new WebSocket(`ws://127.0.0.1:${location.port}/repos/${state.repoId}/events?token=${boot.token}`);
+  events.addEventListener("message", () => void refresh().catch(showError));
+}
+
+async function refresh() {
+  const [status, gate, diff, slices] = await Promise.all([
+    api(`/repos/${state.repoId}/status`),
+    api(`/repos/${state.repoId}/gate`),
+    api(`/repos/${state.repoId}/diff?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`),
+    api(`/repos/${state.repoId}/slices`),
+  ]);
+  const signature = JSON.stringify({
+    gate: gate.state,
+    lease: gate.lease,
+    purpose: gate.slice?.purpose,
+    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}`),
+    scope: state.scope,
+    mode: state.mode,
+    fileId: state.fileId,
+    symbol: state.symbol,
+    locations: state.locations.map((item) => `${item.path}:${item.line}`),
+  });
+  if (signature === state.signature) return;
+  state.signature = signature;
+  $("branch").textContent = `${status.baseRef}...${status.branch}`;
+  $("gate-label").textContent = gate.lease === "revert" ? "待撤回" : labels[gate.state];
+  document.querySelectorAll("[data-scope]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.scope === state.scope);
+  });
+  renderSummary(gate);
+  renderFiles(diff.files ?? []);
+  renderHistory(slices);
+  if (!state.fileId && diff.files?.[0]) state.fileId = diff.files[0].fileId;
+  if (state.fileId && (diff.files ?? []).some((file) => file.fileId === state.fileId)) await renderPatch();
+  else {
+    $("diff").replaceChildren();
+    $("viewbar").replaceChildren();
+    $("file-head").textContent = gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "";
+  }
+}
+
+function renderSummary(gate) {
+  const slice = gate.slice;
+  $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
+  $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";
+  const wrap = $("decision-wrap");
+  const decisions = $("decisions");
+  decisions.replaceChildren();
+  const show = gate.state === "awaiting_release" || gate.state === "awaiting_review";
+  wrap.hidden = !show;
+  if (!show || !slice) return;
+  const primary = gate.state === "awaiting_release" ? "放行" : "核对通过";
+  decisions.append(decision(primary, () => act(gate.state === "awaiting_release" ? "release" : "ack", slice.sliceId)));
+  decisions.append(decision("退回", () => act("reject", slice.sliceId)));
+  const banner = $("banner");
+  banner.hidden = !(slice.mismatch || gate.lease === "revert");
+  banner.textContent = gate.lease === "revert"
+    ? "已退回。Agent 现在只能撤回这一提交。"
+    : slice.mismatch
+      ? "提交说明和作用说明不一致。核对或退回后才能开始下一段。"
+      : "";
+}
+
+function decision(label, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "decision";
+  button.textContent = label;
+  button.addEventListener("click", () => void onClick().catch(showError));
+  return button;
+}
+
+async function act(name, sliceId) {
+  const reason = name === "reject" ? window.prompt("退回原因", "") ?? "" : "";
+  if (name === "reject" && reason === null) return;
+  await api(`/repos/${state.repoId}/gate/${name}`, {
+    method: "POST",
+    body: JSON.stringify({ sliceId, reason }),
+  });
+  state.sliceId = "";
+  await refresh();
+}
+
+function renderFiles(files) {
+  const aside = $("files");
+  aside.replaceChildren();
+  if (files.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "这一范围没有文件差异。";
+    aside.append(empty);
+    return;
+  }
+  for (const file of files) {
+    const row = document.createElement("div");
+    row.className = `file${file.fileId === state.fileId ? " selected" : ""}`;
+    const name = document.createElement("span");
+    name.textContent = file.path.split("/").pop();
+    const stat = document.createElement("small");
+    stat.textContent = `+${file.additions} -${file.deletions}`;
+    row.append(name, stat);
+    row.addEventListener("click", () => {
+      state.fileId = file.fileId;
+      state.source = "";
+      $("source").hidden = true;
+      void refresh().catch(showError);
+    });
+    aside.append(row);
+  }
+}
+
+async function renderPatch() {
+  const patch = await api(`/repos/${state.repoId}/files/${state.fileId}/patch?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`);
+  $("file-head").textContent = patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path;
+  renderViewbar();
+  const diff = $("diff");
+  diff.replaceChildren();
+  if (state.mode === "unified") diff.append(unified(patch));
+  else diff.append(split(patch));
+}
+
+function renderViewbar() {
+  const bar = $("viewbar");
+  bar.className = "viewbar";
+  bar.replaceChildren();
+  const kicker = document.createElement("p");
+  kicker.className = "kicker";
+  kicker.textContent = "查看";
+  const row = document.createElement("div");
+  row.className = "row";
+  row.append(
+    viewButton("单文件", state.mode === "unified", () => { state.mode = "unified"; }),
+    viewButton("双文件", state.mode === "split", () => { state.mode = "split"; }),
+    viewButton("定义", state.symbol === "definition", () => void symbols("definition")),
+    viewButton("引用", state.symbol === "references", () => void symbols("references")),
+  );
+  bar.append(kicker, row);
+  const hint = document.createElement("p");
+  hint.className = "muted";
+  hint.textContent = "按住 Command 再点左键，跳到实现。普通左键只选中。";
+  bar.append(hint);
+  const box = $("locations");
+  box.replaceChildren();
+  for (const item of state.locations) {
+    const link = document.createElement("span");
+    link.className = "loc";
+    link.textContent = `${item.path}:${item.line}`;
+    link.title = item.preview;
+    link.addEventListener("click", (event) => {
+      if (!event.metaKey) return;
+      event.preventDefault();
+      void openLocation(item);
+    });
+    box.append(link);
+  }
+}
+
+function viewButton(label, active, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.classList.toggle("active", active);
+  button.addEventListener("click", () => void Promise.resolve(onClick()).catch(showError));
+  return button;
+}
+
+function unified(patch) {
+  const frag = document.createDocumentFragment();
+  for (const hunk of patch.hunks ?? []) {
+    let oldLine = hunk.oldStart;
+    let newLine = hunk.newStart;
+    for (const line of hunk.lines) {
+      const side = line.type === "del" ? "base" : "head";
+      const shown = line.type === "del" ? oldLine : newLine;
+      frag.append(lineRow(line.text, line.type, shown, null, side, patch.path));
+      if (line.type !== "add") oldLine += 1;
+      if (line.type !== "del") newLine += 1;
+    }
+  }
+  return frag;
+}
+
+function split(patch) {
+  const left = document.createElement("div");
+  const right = document.createElement("div");
+  left.className = "split-col";
+  right.className = "split-col";
+  const title = (text) => {
+    const node = document.createElement("div");
+    node.className = "file-head";
+    node.textContent = text;
+    return node;
+  };
+  left.append(title("基准"));
+  right.append(title("改后"));
+  for (const hunk of patch.hunks ?? []) {
+    const removed = [];
+    const added = [];
+    const flush = () => {
+      const count = Math.max(removed.length, added.length);
+      for (let index = 0; index < count; index += 1) {
+        left.append(lineRow(removed[index]?.text ?? "", removed[index] ? "del" : "context", removed[index]?.line ?? "", null, "base", patch.path));
+        right.append(lineRow(added[index]?.text ?? "", added[index] ? "add" : "context", added[index]?.line ?? "", null, "head", patch.path));
+      }
+      removed.length = 0;
+      added.length = 0;
+    };
+    let oldLine = hunk.oldStart;
+    let newLine = hunk.newStart;
+    for (const line of hunk.lines) {
+      if (line.type === "context") {
+        flush();
+        left.append(lineRow(line.text, "context", oldLine, null, "base", patch.path));
+        right.append(lineRow(line.text, "context", newLine, null, "head", patch.path));
+        oldLine += 1;
+        newLine += 1;
+      } else if (line.type === "del") {
+        removed.push({ text: line.text, line: oldLine });
+        oldLine += 1;
+      } else {
+        added.push({ text: line.text, line: newLine });
+        newLine += 1;
+      }
+    }
+    flush();
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "split";
+  wrap.append(left, right);
+  return wrap;
+}
+
+function lineRow(text, type, primary, secondary, side, path) {
+  const row = document.createElement("div");
+  row.className = `line ${type === "context" ? "" : type}`;
+  row.dataset.line = String(primary);
+  row.dataset.side = side;
+  row.dataset.path = path;
+  const num = document.createElement("span");
+  num.className = "num";
+  num.textContent = primary === "" ? "" : String(primary);
+  const code = document.createElement("span");
+  code.textContent = text || " ";
+  if (secondary !== null) {
+    const oldNum = document.createElement("span");
+    oldNum.className = "num";
+    oldNum.textContent = "";
+    row.append(oldNum);
+  }
+  row.append(num, code);
+  return row;
+}
+
+async function symbols(kind) {
+  state.symbol = state.symbol === kind ? null : kind;
+  state.locations = [];
+  if (state.symbol) {
+    if (!state.identifier) throw new Error("先在差异里点一个函数或对象名");
+    const result = await api(`/repos/${state.repoId}/symbols?kind=${kind}&identifier=${encodeURIComponent(state.identifier)}`);
+    state.locations = result.items ?? [];
+  }
+  await refresh();
+}
+
+async function openLocation(item) {
+  const files = [...document.querySelectorAll(".file span")].map((node) => node.textContent);
+  if (files.includes(item.path.split("/").pop()) && $( "diff").querySelector(`[data-path$="${item.path}"][data-line="${item.line}"]`)) {
+    const target = $("diff").querySelector(`[data-line="${item.line}"]`);
+    target?.scrollIntoView({ block: "center" });
+    return;
+  }
+  const source = await api(`/repos/${state.repoId}/source?path=${encodeURIComponent(item.path)}&line=${item.line}`);
+  state.source = source.text;
+  const box = $("source");
+  box.hidden = false;
+  box.textContent = `${source.path}:${source.line}\n${source.text}`;
+}
+
+function identifierFrom(event) {
+  const row = event.target.closest?.(".line");
+  if (!row) return "";
+  const text = row.querySelector("span:last-child")?.textContent ?? "";
+  let offset = 0;
+  const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
+  if (range && row.contains(range.startContainer)) offset = range.startOffset;
+  const match = [...text.matchAll(/[A-Za-z_$][\w$]*/g)].find((item) => offset >= item.index && offset <= item.index + item[0].length);
+  return match?.[0] ?? [...text.matchAll(/[A-Za-z_$][\w$]*/g)].at(-1)?.[0] ?? "";
+}
+
+function renderHistory(slices) {
+  const body = $("history");
+  body.replaceChildren();
+  for (const slice of slices) {
+    const row = document.createElement("tr");
+    row.dataset.slice = slice.sliceId;
+    for (const value of [slice.createdAt.slice(0, 16).replace("T", " "), slice.purpose, labels[slice.state] ?? slice.state]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    }
+    row.addEventListener("click", () => {
+      state.sliceId = slice.sliceId;
+      state.scope = "slice";
+      state.fileId = "";
+      void refresh().catch(showError);
+    });
+    body.append(row);
+  }
+}
+
+function showNotice(text) {
+  const node = $("notice");
+  node.hidden = !text;
+  node.textContent = text;
+}
+
+function showError(error) {
+  showNotice(error instanceof Error ? error.message : String(error));
+}
+
+document.addEventListener("click", (event) => {
+  const scope = event.target.closest?.("[data-scope]");
+  if (scope) {
+    state.scope = scope.dataset.scope;
+    state.sliceId = "";
+    state.fileId = "";
+    void refresh().catch(showError);
+    return;
+  }
+  if (event.target.closest?.("#install")) {
+    event.preventDefault();
+    if (!state.repoId) {
+      showNotice("仓库还没有登记成功，请刷新页面后再安装。");
+      return;
+    }
+    void api(`/repos/${state.repoId}/gate/install`, { method: "POST", body: "{}" })
+      .then(() => {
+        showNotice("门禁已写入这个仓库。请新开一个 Agent 对话，放行前的写文件才会被拦住。");
+      })
+      .catch(showError);
+    return;
+  }
+  const word = identifierFrom(event);
+  if (!word) return;
+  state.identifier = word;
+  if (!event.metaKey) return;
+  event.preventDefault();
+  void api(`/repos/${state.repoId}/symbols?kind=implementation&identifier=${encodeURIComponent(word)}`)
+    .then(async (result) => {
+      const items = result.items ?? [];
+      if (items.length === 1) return openLocation(items[0]);
+      state.symbol = "implementation";
+      state.locations = items;
+      if (items.length === 0) throw new Error(`没有找到 ${word} 的实现`);
+      renderViewbar();
+    })
+    .catch(showError);
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Meta") document.body.classList.add("cmd");
+});
+window.addEventListener("keyup", (event) => {
+  if (event.key === "Meta") document.body.classList.remove("cmd");
+});
+window.addEventListener("blur", () => document.body.classList.remove("cmd"));
+
+void bootRepo().catch(showError);
