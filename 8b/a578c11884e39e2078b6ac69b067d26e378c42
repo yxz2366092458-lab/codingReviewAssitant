@@ -1,0 +1,35 @@
+apps/web/index.html
+  s_5f3d8f56fde9b6::t_1567a9da5575db 42-45
+apps/daemon/src/summary.ts
+  s_5f3d8f56fde9b6::t_943df1589d7539 1-14
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_275ef05ad5aeac 35
+  s_5f3d8f56fde9b6::t_da4a4601bbe19c 273-274
+test/summary.test.ts
+  s_5f3d8f56fde9b6::t_f15204d30e342c 1-16
+apps/web/app.js
+  s_5f3d8f56fde9b6::t_af37ab8bb1bc40 154
+  s_5f3d8f56fde9b6::t_c3caf5d8939d56 223-229
+  s_5f3d8f56fde9b6::t_39843a2c136f48 177
+  s_5f3d8f56fde9b6::t_bba8d77c015ae6 260-261
+  s_5f3d8f56fde9b6::t_505c12674615a0 168
+  s_5f3d8f56fde9b6::t_7fe530338070c9 10
+apps/web/app.css
+  s_5f3d8f56fde9b6::t_5b1e28983dbb6a 74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8ba578c11884e39e2078b6ac69b067d26e378c42",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
