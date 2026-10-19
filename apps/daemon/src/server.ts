@@ -271,7 +271,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "GET" && rest === "diff") {
       const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId);
-      sendJson(res, 200, { scope, files: files.map((file) => ({ ...file, summary: summarizeFile(file) })) });
+      const args = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId);
+      const summarized = [];
+      for (const file of files) {
+        summarized.push({ ...file, summary: await fileSummary(repo.path, args, file) });
+      }
+      sendJson(res, 200, { scope, files: summarized });
       return;
     }
     const patchMatch = /^files\/([^/]+)\/patch$/.exec(rest);
@@ -332,6 +337,16 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       if (parent) return [parent, commit];
     }
     return ["HEAD"];
+  }
+
+  async function fileSummary(cwd: string, diffArgs: string[], file: Parameters<typeof summarizeFile>[0]): Promise<string> {
+    if (file.binary) return summarizeFile(file, "");
+    try {
+      const text = await git(cwd, ["diff", "-U3", "--find-renames", ...diffArgs, "--", file.path]);
+      return summarizeFile(file, text);
+    } catch {
+      return summarizeFile(file, "");
+    }
   }
 
   function commitFor(repoId: string, sliceId: string | null): string | null {
