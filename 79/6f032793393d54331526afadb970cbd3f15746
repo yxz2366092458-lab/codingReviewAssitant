@@ -1,0 +1,30 @@
+test/summary.test.ts
+  s_5f3d8f56fde9b6::t_7d133297611a19 4
+  s_5f3d8f56fde9b6::t_85e84ab8db14ba 33-39
+  s_5f3d8f56fde9b6::t_d7067884d80f78 25-32
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_976088c183cd64 372
+  s_5f3d8f56fde9b6::t_df6b648e33d65e 297-299
+  s_5f3d8f56fde9b6::t_2d0e798251fef8 38
+apps/daemon/src/summary-ai.ts
+  s_5f3d8f56fde9b6::t_10d9ca1ca0e620 1,5-35,53-71,81-82,93-94,110,115
+  s_5f3d8f56fde9b6::t_b1298eb2024da6 2-4,36-52,72-80,83-92,95-109,111-114
+apps/web/app.css
+  s_5f3d8f56fde9b6::t_aaa7d561e85237 86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "796f032793393d54331526afadb970cbd3f15746",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
