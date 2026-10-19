@@ -1,0 +1,26 @@
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_357906caea8aef 274-279
+  s_5f3d8f56fde9b6::t_c9d8f0a5762d6e 342-351
+apps/daemon/src/summary.ts
+  s_5f3d8f56fde9b6::t_2298ac4c37f47b 10,14-21,29-43,46-48,72,91
+  s_5f3d8f56fde9b6::t_5023ee28cc1453 3,7,12-13,22-28,44-45,49-71,73-90,92-95
+test/summary.test.ts
+  s_5f3d8f56fde9b6::t_32e7302d1d1f9b 5-14,16,18-19,22
+  s_5f3d8f56fde9b6::t_7b9286ee76aaa0 15,17,20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "00d3a7c595ec798d5505678e81bf100e2aee290c",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
