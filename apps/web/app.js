@@ -48,6 +48,7 @@ async function bootRepo() {
   $("repo-select").addEventListener("change", () => {
     void switchRepo($("repo-select").value).catch(showError);
   });
+  $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
@@ -84,6 +85,13 @@ function renderRepoSelect() {
   select.value = state.repoId;
   const current = state.repos.find((repo) => repo.id === state.repoId);
   $("repo-name").textContent = current ? folderName(current.path) : "代码评审";
+}
+
+async function pickRepo() {
+  showNotice("正在打开本机文件夹选择框。");
+  const picked = await api("/repos/pick-path", { method: "POST", body: "{}" });
+  $("repo-path").value = picked.path;
+  showNotice("已选中路径，可以登记。");
 }
 
 async function registerRepo() {
