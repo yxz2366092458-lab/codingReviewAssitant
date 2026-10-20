@@ -12,11 +12,13 @@
         <label class="muted" for="repo-select">工程</label>
         <select id="repo-select"></select>
         <input id="repo-path" type="text" placeholder="登记路径" spellcheck="false" />
+        <button type="button" id="pick-repo">选择</button>
         <button type="button" id="register-repo">登记</button>
       </div>
       <div>
         <strong id="repo-name">代码评审</strong>
-        <span id="branch" class="muted"></span>
+        <span id="base-ref" class="muted"></span>
+        <select id="branch-select" aria-label="分支"></select>
       </div>
       <span id="gate-label" class="state"></span>
       <div class="top-actions">
@@ -29,6 +31,7 @@
     <section class="summary">
       <p id="meta" class="muted"></p>
       <h1 id="purpose">等待 Agent 登记这一小段的作用。</h1>
+      <p id="round-label" class="round-label" hidden></p>
       <div id="decision-wrap">
         <p class="kicker">结论</p>
         <div id="decisions" class="row"></div>
@@ -38,7 +41,10 @@
     <div class="workspace">
       <aside id="files"></aside>
       <section class="diff-pane">
-        <div id="file-head" class="file-head"></div>
+        <div id="file-head" class="file-head">
+          <div id="file-path"></div>
+          <p id="file-summary" class="file-summary" hidden></p>
+        </div>
         <div id="viewbar"></div>
         <div id="locations"></div>
         <div id="diff"></div>

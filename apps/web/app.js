@@ -7,6 +7,7 @@ const state = {
   symbol: null,
   identifier: "",
   fileId: "",
+  files: [],
   sliceId: "",
   locations: [],
   source: "",
@@ -48,7 +49,16 @@ async function bootRepo() {
   $("repo-select").addEventListener("change", () => {
     void switchRepo($("repo-select").value).catch(showError);
   });
+  $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
+  $("branch-select").addEventListener("change", () => {
+    void switchBranch().catch(async (error) => {
+      showError(error);
+      state.signature = "";
+      $("branch-select").dataset.signature = "";
+      await refresh().catch(showError);
+    });
+  });
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -71,6 +81,36 @@ function repoLabel(repo, repos) {
   return parts.slice(-2).join("/");
 }
 
+function renderBranches(status, names) {
+  $("base-ref").textContent = status.baseRef ? `${status.baseRef}...` : "";
+  const select = $("branch-select");
+  const branches = names.length ? names : status.branch ? [status.branch] : [];
+  const signature = `${branches.join("\n")}\0${status.branch}`;
+  if (select.dataset.signature === signature) return;
+  select.dataset.signature = signature;
+  select.replaceChildren();
+  for (const name of branches) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    option.selected = name === status.branch;
+    select.append(option);
+  }
+}
+
+async function switchBranch() {
+  const branch = $("branch-select").value;
+  try {
+    await api(`/repos/${state.repoId}/branch`, { method: "POST", body: JSON.stringify({ branch }) });
+  } catch (error) {
+    $("branch-select").dataset.signature = "";
+    throw error;
+  }
+  state.signature = "";
+  $("branch-select").dataset.signature = "";
+  await refresh();
+}
+
 function renderRepoSelect() {
   const select = $("repo-select");
   select.replaceChildren();
@@ -84,6 +124,13 @@ function renderRepoSelect() {
   select.value = state.repoId;
   const current = state.repos.find((repo) => repo.id === state.repoId);
   $("repo-name").textContent = current ? folderName(current.path) : "代码评审";
+}
+
+async function pickRepo() {
+  showNotice("正在打开本机文件夹选择框。");
+  const picked = await api("/repos/pick-path", { method: "POST", body: "{}" });
+  $("repo-path").value = picked.path;
+  showNotice("已选中路径，可以登记。");
 }
 
 async function registerRepo() {
@@ -132,30 +179,34 @@ function connect() {
 }
 
 async function refresh() {
-  const [status, gate, diff, slices] = await Promise.all([
+  const [status, gate, diff, slices, branchList] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
     api(`/repos/${state.repoId}/gate`),
     api(`/repos/${state.repoId}/diff?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`),
     api(`/repos/${state.repoId}/slices`),
+    api(`/repos/${state.repoId}/branches`),
   ]);
   const signature = JSON.stringify({
     gate: gate.state,
     lease: gate.lease,
     purpose: gate.slice?.purpose,
-    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}`),
+    finalRound: gate.finalRound,
+    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
+    branch: status.branch,
     fileId: state.fileId,
     symbol: state.symbol,
     locations: state.locations.map((item) => `${item.path}:${item.line}`),
   });
   if (signature === state.signature) return;
   state.signature = signature;
-  $("branch").textContent = `${status.baseRef}...${status.branch}`;
+  renderBranches(status, branchList.branches ?? []);
   $("gate-label").textContent = gate.lease === "revert" ? "待撤回" : labels[gate.state];
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
   });
+  state.files = diff.files ?? [];
   renderSummary(gate);
   renderFiles(diff.files ?? []);
   renderHistory(slices);
@@ -164,7 +215,7 @@ async function refresh() {
   else {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
-    $("file-head").textContent = gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "";
+    showFileHead(gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "", "");
   }
 }
 
@@ -172,6 +223,10 @@ function renderSummary(gate) {
   const slice = gate.slice;
   $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
   $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";
+  const round = $("round-label");
+  round.hidden = gate.finalRound !== true && gate.finalRound !== false;
+  round.textContent = gate.finalRound === true ? "最后一轮" : gate.finalRound === false ? "不是最后一轮" : "";
+  round.classList.toggle("final", gate.finalRound === true);
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
   decisions.replaceChildren();
@@ -210,6 +265,13 @@ async function act(name, sliceId) {
   await refresh();
 }
 
+function showFileHead(pathText, summary) {
+  $("file-path").textContent = pathText;
+  const node = $("file-summary");
+  node.hidden = !summary;
+  node.textContent = summary;
+}
+
 function renderFiles(files) {
   const aside = $("files");
   aside.replaceChildren();
@@ -240,7 +302,8 @@ function renderFiles(files) {
 
 async function renderPatch() {
   const patch = await api(`/repos/${state.repoId}/files/${state.fileId}/patch?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`);
-  $("file-head").textContent = patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path;
+  const file = state.files.find((item) => item.fileId === state.fileId);
+  showFileHead(patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path, file?.summary ?? "");
   renderViewbar();
   const diff = $("diff");
   diff.replaceChildren();

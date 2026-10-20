@@ -44,6 +44,7 @@ button.decision { min-width: 96px; }
 .top { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: var(--panel); }
 .project-switch { display: flex; gap: 8px; align-items: center; }
 .project-switch select,
+#branch-select,
 .project-switch input {
   border: 1px solid var(--line);
   background: var(--bg);
@@ -56,6 +57,17 @@ button.decision { min-width: 96px; }
 .muted, .kicker { color: var(--muted); }
 .kicker { font-size: 12px; margin: 12px 0 6px; }
 h1 { font-size: 22px; line-height: 1.4; margin: 0; font-weight: 600; }
+.round-label { margin: 8px 0 0; font-weight: 650; }
+.round-label.final {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #9a3412;
+  color: #fffaf5;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
 h2 { font-size: 16px; margin: 0 0 8px; }
 .state { font-weight: 650; }
 .banner { background: var(--fill); padding: 8px 10px; }
@@ -71,7 +83,7 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 }
 .file.selected { background: var(--fill); }
 .file small { color: var(--muted); }
-.viewbar, .file-head, #locations { padding: 8px 12px; }
+.file-summary { margin: 6px 0 0; line-height: 1.6; white-space: pre-wrap; }
 #locations { color: var(--muted); font-size: 13px; }
 .loc { cursor: pointer; text-decoration: underline; margin-right: 10px; }
 #diff { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.45; overflow: auto; }

@@ -1,0 +1,51 @@
+#!/bin/bash
+MACOS="$(cd "$(dirname "$0")" && pwd)"
+ROOT_FILE="$MACOS/../Resources/repo-root"
+if [[ -f "$ROOT_FILE" ]]; then
+  ROOT="$(tr -d '\n' < "$ROOT_FILE")"
+else
+  ROOT="$(cd "$MACOS/../../../.." && pwd)"
+fi
+cd "$ROOT" || exit 1
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH"
+SOURCE="$ROOT/apps/mac/Panel.swift"
+PANEL="$MACOS/panel"
+INFO="$HOME/Library/Application Support/CodingReviewAssistant/daemon.json"
+
+if ! command -v node >/dev/null 2>&1; then
+  osascript -e 'display alert "找不到 node" message "请先安装 Node.js。"'
+  exit 1
+fi
+
+alive() {
+  kill -0 "$1" 2>/dev/null
+}
+
+read_field() {
+  node -e 'const fs=require("fs"); const i=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); process.stdout.write(String(i[process.argv[2]]));' "$INFO" "$1"
+}
+
+if [[ ! -f "$INFO" ]] || ! alive "$(read_field pid)"; then
+  node --experimental-strip-types apps/daemon/src/index.ts --no-open >/tmp/coding-review-daemon.log 2>&1 &
+  disown
+fi
+
+url=""
+for _ in $(seq 1 50); do
+  if [[ -f "$INFO" ]] && alive "$(read_field pid)"; then
+    url="http://127.0.0.1:$(read_field port)/"
+    break
+  fi
+  sleep 0.2
+done
+
+if [[ -z "$url" ]]; then
+  osascript -e 'display alert "评审服务没有启动" message "请查看 /tmp/coding-review-daemon.log。"'
+  exit 1
+fi
+
+if [[ ! -x "$PANEL" || "$SOURCE" -nt "$PANEL" ]]; then
+  swiftc -framework Cocoa -framework WebKit -o "$PANEL" "$SOURCE" || exit 1
+fi
+
+exec "$PANEL" "$url"
