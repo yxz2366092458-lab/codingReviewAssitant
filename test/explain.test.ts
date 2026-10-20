@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, parseCommentAction, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { applySelectionEdit, explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, parseCommentAction, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
 import { currentSessionId, listWorkSessions, readSessionBranches } from "../apps/daemon/src/work-branch.ts";
 
 const lines = [{ path: "apps/web/app.js", side: "head" as const, line: 12, text: "return total;" }];
@@ -39,6 +42,29 @@ test("评论动作能解析成答复或修改，格式不对就当作答复", ()
   const broken = "请把这行改成 return 0;";
   assert.deepEqual(parseCommentAction(broken), { kind: "reply", text: broken });
   assert.equal(parseCommentAction("动作：修改\n说明：\n还没给出代码。").kind, "reply");
+});
+
+test("修改只替换核对过的当前文件行", () => {
+  const root = mkdtempSync(join(tmpdir(), "review-edit-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "const a = 1;\nreturn total;\n\nconst b = 2;\n");
+  applySelectionEdit(root, [
+    { path: "a.ts", side: "head", line: 2, text: "return total;" },
+    { path: "a.ts", side: "head", line: 3, text: " " },
+  ], "return 0;\nfilled");
+  assert.equal(readFileSync(file, "utf8"), "const a = 1;\nreturn 0;\nfilled\nconst b = 2;\n");
+});
+
+test("基准侧、原文变化和仓库外路径都不改文件", () => {
+  const root = mkdtempSync(join(tmpdir(), "review-edit-"));
+  const file = join(root, "a.ts");
+  const original = "return total;\n";
+  writeFileSync(file, original);
+  const head = [{ path: "a.ts", side: "head" as const, line: 1, text: "return total;" }];
+  assert.throws(() => applySelectionEdit(root, [{ ...head[0], side: "base" }], "return 0;"), /只能修改当前文件里的代码/);
+  assert.throws(() => applySelectionEdit(root, [{ ...head[0], text: "return other;" }], "return 0;"), /选中的代码已经变了/);
+  assert.throws(() => applySelectionEdit(root, [{ ...head[0], path: "../outside.ts" }], "return 0;"), /路径超出仓库/);
+  assert.equal(readFileSync(file, "utf8"), original);
 });
 
 test("非法行会被丢掉，同一会话累积评论", () => {

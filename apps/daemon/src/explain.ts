@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { completePrompt } from "./summary-ai.ts";
 
@@ -168,6 +170,42 @@ export function parseCommentAction(raw: string): CommentAction {
   const code = rows.slice(codeAt + 1).join("\n").replace(/\s+$/, "");
   if (!text || !code.trim()) return { kind: "reply", text: source };
   return { kind: "edit", text, code };
+}
+
+export function applySelectionEdit(root: string, lines: CodeLine[], code: string): ExplainAnchor {
+  const groups = selectionAnchors(lines);
+  if (groups.length !== 1) throw new Error("请选择同一侧连续的代码行");
+  const group = groups[0];
+  if (!group || group.side !== "head") throw new Error("只能修改当前文件里的代码");
+  if (!code.trim()) throw new Error("没有可替换的代码");
+  const full = fileInside(root, group.path);
+  let original = "";
+  try {
+    original = readFileSync(full, "utf8");
+  } catch {
+    throw new Error("文件不存在");
+  }
+  const rows = original.split("\n");
+  const ending = original.endsWith("\n");
+  if (ending) rows.pop();
+  for (const line of group.lines) {
+    const current = rows[line.line - 1];
+    if (current === undefined || !sameLine(current, line.text)) throw new Error("选中的代码已经变了");
+  }
+  rows.splice(group.start - 1, group.lines.length, ...code.replace(/\s+$/, "").split("\n"));
+  writeFileSync(full, ending ? `${rows.join("\n")}\n` : rows.join("\n"));
+  return { path: group.path, side: group.side, start: group.start, end: group.end };
+}
+
+function fileInside(root: string, filePath: string): string {
+  const full = resolve(root, filePath);
+  const rel = relative(root, full);
+  if (!filePath.trim() || rel.startsWith("..") || rel.includes(`..${sep}`)) throw new Error("路径超出仓库");
+  return full;
+}
+
+function sameLine(fileLine: string, sent: string): boolean {
+  return fileLine === sent || (fileLine === "" && sent === " ");
 }
 
 export function remember(key: string, history: ExplainTurn[], lines: CodeLine[], comment: string, reply: string): ExplainTurn[] {
@@ -354,6 +392,7 @@ export async function explainInSession(
   lines: CodeLine[],
   comment: string,
   anchor?: ExplainAnchor,
+  root = "",
 ): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor }> {
   if (!lines.length) throw new Error("先选中代码行");
   const target = anchor ?? anchorFor(lines);
@@ -371,6 +410,10 @@ export async function explainInSession(
   const action = parseCommentAction(reply);
   const shown = action.text.trim();
   if (!shown) throw new Error("解释失败");
+  if (action.kind === "edit") {
+    if (!root) throw new Error("不能修改代码");
+    applySelectionEdit(root, lines, action.code);
+  }
   const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: shown }].slice(-12);
   saveThread(db, repoId, sessionId, target, turns);
   return { reply: shown, turns, anchor: target };

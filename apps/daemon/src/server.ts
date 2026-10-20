@@ -392,7 +392,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       }
       const comment = String(body.comment ?? "").trim();
       if (!comment) throw new GateError(400, "先写下评论");
-      const result = await explainInSession(db, repo.id, session, lines, comment, anchor);
+      const result = await explainInSession(db, repo.id, session, lines, comment, anchor, repo.path);
       sendJson(res, 200, { sessionId: session, ...result });
       return;
     }
