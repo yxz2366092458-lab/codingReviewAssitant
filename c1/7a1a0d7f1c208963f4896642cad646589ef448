@@ -1,0 +1,47 @@
+apps/daemon/src/server.ts
+  s_497308a7cd5bfd::t_930e98a59ac197 39
+  s_497308a7cd5bfd::t_5c997660b2edbe 387-395
+apps/daemon/src/explain.ts
+  s_497308a7cd5bfd::t_b27adb9851b065 23-29,32
+  s_497308a7cd5bfd::t_648e51837f763f 284,339-366
+  s_497308a7cd5bfd::t_db4f03f0e93721 209-226,231-283
+  s_497308a7cd5bfd::t_6f500ca4a9d835 119-128
+  s_497308a7cd5bfd::t_98e14c24bddbbb 285
+apps/web/index.html
+  s_497308a7cd5bfd::t_3ebb2873f48c44 7
+  s_497308a7cd5bfd::t_6e2c77f5fad0b7 59-60
+  s_497308a7cd5bfd::t_d0edf579ace661 79
+test/explain.test.ts
+  s_497308a7cd5bfd::t_4631afe5625c97 68
+  s_497308a7cd5bfd::t_64593235c0b44d 104-120
+  s_497308a7cd5bfd::t_a1f5248dbfdc54 4
+apps/web/app.js
+  s_497308a7cd5bfd::t_5ed010a4f6182e 19
+  s_497308a7cd5bfd::t_0030f37e419222 164-165
+  s_497308a7cd5bfd::t_4497a7a40a8bf2 249
+  s_497308a7cd5bfd::t_a4330b21369c20 693-694,697,699-714,718-806
+  s_497308a7cd5bfd::t_b68182a88cbece 663,667,669
+  s_497308a7cd5bfd::t_387055fccd8eb9 847-851,853
+  s_497308a7cd5bfd::t_84cd8c1e86cb13 866
+  s_497308a7cd5bfd::t_5c1bb80484f36e 807,809-827
+  s_497308a7cd5bfd::t_06cb2185bdb6c9 865
+  s_497308a7cd5bfd::t_876bec253e76b0 808
+apps/web/app.css
+  s_497308a7cd5bfd::t_a94020fa83b84f 131-134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c17a1a0d7f1c208963f4896642cad646589ef448",
+  "prompts": {},
+  "sessions": {
+    "s_497308a7cd5bfd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fdea6284-fcb1-49cb-81a6-403628394b65",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
