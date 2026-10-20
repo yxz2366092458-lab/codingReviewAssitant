@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import type { FileChange, FileStatus } from "../../../packages/protocol/src/index.ts";
+import { cursorProxyTarget } from "./cursor-proxy.ts";
 import { summarizeFile } from "./summary.ts";
 
 const statusLabel: Record<FileStatus, string> = {
@@ -80,39 +78,31 @@ function collectText(value: unknown, parts: string[]): void {
   for (const block of record.content) collectText(block, parts);
 }
 
-function readProvider(): { model: string; url: string; token: string; wire: string } {
-  const text = readFileSync(join(homedir(), ".codex", "config.toml"), "utf8");
-  const model = /^model\s*=\s*"([^"]+)"/m.exec(text)?.[1] ?? "";
-  const provider = /^model_provider\s*=\s*"([^"]+)"/m.exec(text)?.[1] ?? "";
-  const block = new RegExp(`\\[model_providers\\.${provider}\\]([\\s\\S]*?)(?:\\n\\[|$)`).exec(text)?.[1] ?? "";
-  const base = /base_url\s*=\s*"([^"]+)"/.exec(block)?.[1] ?? "";
-  const token = /experimental_bearer_token\s*=\s*"([^"]+)"/.exec(block)?.[1] ?? "";
-  const wire = /wire_api\s*=\s*"([^"]+)"/.exec(block)?.[1] ?? "responses";
-  if (!model || !base || !token) throw new Error("没有模型配置");
-  return { model, url: base.replace(/\/$/, ""), token, wire };
-}
-
 export async function completePrompt(prompt: string): Promise<string> {
   return ask(prompt);
 }
 
 async function ask(prompt: string): Promise<string> {
-  const config = readProvider();
-  const responses = config.wire === "responses";
-  const response = await fetch(responses ? `${config.url}/responses` : `${config.url}/chat/completions`, {
+  const target = cursorProxyTarget();
+  const response = await fetch(`${target.url}/responses`, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${config.token}`,
+      authorization: `Bearer ${target.token}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify(
-      responses
-        ? { model: config.model, input: prompt, store: false }
-        : { model: config.model, messages: [{ role: "user", content: prompt }] },
-    ),
-    signal: AbortSignal.timeout(60000),
+    body: JSON.stringify({ model: "cursor", input: prompt, store: false }),
+    signal: AbortSignal.timeout(100_000),
   });
-  if (!response.ok) throw new Error("总结失败");
+  if (!response.ok) {
+    let message = "总结失败";
+    try {
+      const payload = (await response.json()) as { error?: unknown };
+      if (typeof payload.error === "string" && payload.error.trim()) message = payload.error.trim();
+    } catch {
+      message = "总结失败";
+    }
+    throw new Error(message);
+  }
   const text = responseText(await response.json());
   if (!text) throw new Error("总结为空");
   return text;

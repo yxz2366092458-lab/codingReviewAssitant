@@ -35,6 +35,7 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
+import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, loadTurns, normalizeLines, resolveExplainSession } from "./explain.ts";
 import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
@@ -104,6 +105,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   const watcher = watchRepo(repoPath, () => {
     void onRepoChange();
   });
+
+  const cursorProxy = await startCursorProxy({ repoPath });
+  useCursorProxy({ url: cursorProxy.url, token: cursorProxy.token });
 
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   const address = server.address();
@@ -531,9 +535,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       new Promise((resolveClose) => {
         stopped = true;
         watcher.close();
-        server.close(() => {
-          db.close();
-          resolveClose();
+        useCursorProxy(null);
+        void cursorProxy.close().finally(() => {
+          server.close(() => {
+            db.close();
+            resolveClose();
+          });
         });
       }),
   };
