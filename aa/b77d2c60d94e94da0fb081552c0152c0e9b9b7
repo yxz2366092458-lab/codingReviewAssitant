@@ -1,0 +1,43 @@
+test/explain.test.ts
+  s_f4121c7339bb99::t_2346e8e1d4f096 93-101,103
+  s_f4121c7339bb99::t_d7721f5674cbec 102
+  s_f4121c7339bb99::t_2df5bb5721727d 4
+apps/daemon/src/explain.ts
+  s_f4121c7339bb99::t_649389c2084142 230-231,233-235
+  s_f4121c7339bb99::t_d699e16c06caf9 16-28
+  s_f4121c7339bb99::t_123586ba59e0a0 139-142,146-149,153,155-159,162,165-168,174-196,201-203,205-206,208,216-222
+  s_f4121c7339bb99::t_ad24d7d062d144 51-102
+  s_f4121c7339bb99::t_ac546e6878bb4e 246-247
+  s_f4121c7339bb99::t_92a5a369dfa418 223
+apps/web/app.js
+  s_f4121c7339bb99::t_ec0e2e5d0691f0 18-19
+  s_f4121c7339bb99::t_8fec110f91e625 161-162
+  s_f4121c7339bb99::t_7df65af9c8192d 364,527
+  s_f4121c7339bb99::t_b4a36e7ed3f98f 385
+  s_f4121c7339bb99::t_d494dac0f2c8eb 547-630,634,636-645,648-649,659-664,666-669,671,673
+  s_f4121c7339bb99::t_47af81e43ad256 244
+apps/web/app.css
+  s_f4121c7339bb99::t_cac3f6f95ec580 111-130
+apps/web/index.html
+  s_f4121c7339bb99::t_b2f5ee9cf1dec2 7,79
+apps/daemon/src/server.ts
+  s_f4121c7339bb99::t_365af17358c470 39
+  s_f4121c7339bb99::t_88d959f8be7d19 383
+  s_f4121c7339bb99::t_18c320c5496104 375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "aab77d2c60d94e94da0fb081552c0152c0e9b9b7",
+  "prompts": {},
+  "sessions": {
+    "s_f4121c7339bb99": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "af8e6a1e-88ab-466c-b257-f112c88f53a1",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
