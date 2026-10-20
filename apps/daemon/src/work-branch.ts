@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { checkoutBranch, createBranch, listLocalBranches, mergeFastForward, renameBranch } from "./branches.ts";
+import { assertBranchName, checkoutBranch, createBranch, listLocalBranches, mergeBranch, mergeFastForward, renameBranch } from "./branches.ts";
 
 export function workBranchNames(title: string): { requirement: string; development: string } {
   const slug = title.trim().replace(/\s+/g, "-").replace(/\./g, "").slice(0, 48);
@@ -152,6 +152,19 @@ export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: s
   const pair = readWorkBranches(db, repoId, headBranch);
   if (!pair) return;
   await mergeFastForward(cwd, pair.requirement, pair.development);
+}
+
+export async function mergeRequirementIntoBranch(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  headBranch: string,
+  targetBranch: string,
+): Promise<void> {
+  const target = assertBranchName(targetBranch);
+  const pair = readWorkBranches(db, repoId, headBranch);
+  if (!pair) throw new Error("还没有需求分支");
+  await mergeBranch(cwd, target, pair.requirement);
 }
 
 export type WorkSession = {

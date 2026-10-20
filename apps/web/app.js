@@ -289,6 +289,16 @@ function renderSummary(gate) {
   if (!show || !slice) return;
   const primary = gate.state !== "awaiting_release" ? "核对通过" : gate.phase === "requirement" ? "需求准入" : "放行";
   decisions.append(decision(primary, () => act(gate.state === "awaiting_release" ? "release" : "ack", slice.sliceId)));
+  if (gate.state === "awaiting_review") {
+    const select = document.createElement("select");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "选择分支";
+    select.append(placeholder);
+    decisions.append(select);
+    decisions.append(decision("核验通过", () => verify(slice.sliceId, select)));
+    void fillBranches(select).catch(showError);
+  }
   decisions.append(decision("退回", () => act("reject", slice.sliceId)));
   const banner = $("banner");
   banner.hidden = !(slice.mismatch || gate.lease === "revert");
@@ -314,6 +324,33 @@ async function act(name, sliceId) {
   await api(`/repos/${state.repoId}/gate/${name}`, {
     method: "POST",
     body: JSON.stringify({ sliceId, reason }),
+  });
+  state.sliceId = "";
+  await refresh();
+}
+
+async function fillBranches(select) {
+  const { branches } = await api(`/repos/${state.repoId}/branches`);
+  if (!select.isConnected) return;
+  const chosen = select.value;
+  for (const name of branches) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.append(option);
+  }
+  if (branches.includes(chosen)) select.value = chosen;
+}
+
+async function verify(sliceId, select) {
+  const branch = select.value.trim();
+  if (!branch) {
+    showNotice("请选择要合并过去的分支。");
+    return;
+  }
+  await api(`/repos/${state.repoId}/gate/ack`, {
+    method: "POST",
+    body: JSON.stringify({ sliceId, branch }),
   });
   state.sliceId = "";
   await refresh();

@@ -37,7 +37,7 @@ import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
-import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
+import { admitSession, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -303,6 +303,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const body = await readJson(req);
       const status = await repoStatus(repo.path, repo.base_ref);
       await mergeWorkBranches(db, repo.path, repo.id, status.branch);
+      const branch = String(body.branch ?? "").trim();
+      if (branch) {
+        try {
+          await mergeRequirementIntoBranch(db, repo.path, repo.id, status.branch, branch);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "合并失败";
+          throw new GateError(409, message);
+        }
+      }
       acknowledge(db, String(body.sliceId ?? ""));
       publish(repo.id);
       sendJson(res, 200, gateView(db, repo.id));

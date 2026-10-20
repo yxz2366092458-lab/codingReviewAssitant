@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { mergeFastForward } from "../apps/daemon/src/branches.ts";
-import { admitSession, composerName, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { admitSession, composerName, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
@@ -175,5 +175,80 @@ test("第一轮放行是需求准入，之后的新段是开发过程", () => {
   admitSession(db, "repo", "dev/demo", "slice-1");
   assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-1"), "requirement");
   assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-2"), "development");
+});
+
+function rememberBranches(db: DatabaseSync) {
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    "session",
+    "req/demo",
+    "dev/demo",
+  );
+}
+
+test("需求分支可以合进任意选中的分支，并停回原来的分支", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-pick-merge-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "hold"]);
+  git(cwd, ["branch", "ship"]);
+  git(cwd, ["branch", "req/demo"]);
+  git(cwd, ["switch", "ship"]);
+  writeFileSync(join(cwd, "r.txt"), "r\n");
+  git(cwd, ["add", "r.txt"]);
+  git(cwd, ["commit", "-m", "ship"]);
+  git(cwd, ["switch", "req/demo"]);
+  writeFileSync(join(cwd, "q.txt"), "q\n");
+  git(cwd, ["add", "q.txt"]);
+  git(cwd, ["commit", "-m", "requirement"]);
+  git(cwd, ["switch", "hold"]);
+  const db = new DatabaseSync(":memory:");
+  rememberBranches(db);
+  await mergeRequirementIntoBranch(db, cwd, "repo", "hold", "ship");
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "hold");
+  const files = execFileSync("git", ["ls-tree", "-r", "--name-only", "ship"], { cwd }).toString();
+  assert.match(files, /q\.txt/);
+  assert.match(files, /r\.txt/);
+  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "hold", "missing"), /没有这个本地分支/);
+});
+
+test("合并到选中分支发生冲突时撤回，需求没有进入该分支", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-pick-conflict-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "hold"]);
+  git(cwd, ["branch", "ship"]);
+  git(cwd, ["branch", "req/demo"]);
+  git(cwd, ["switch", "ship"]);
+  writeFileSync(join(cwd, "a.txt"), "ship\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "ship"]);
+  git(cwd, ["switch", "req/demo"]);
+  writeFileSync(join(cwd, "a.txt"), "requirement\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "requirement"]);
+  git(cwd, ["switch", "hold"]);
+  const db = new DatabaseSync(":memory:");
+  rememberBranches(db);
+  const before = execFileSync("git", ["rev-parse", "ship"], { cwd }).toString();
+  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "hold", "ship"));
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "hold");
+  assert.equal(execFileSync("git", ["rev-parse", "ship"], { cwd }).toString(), before);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd }).toString(), "");
 });
 
