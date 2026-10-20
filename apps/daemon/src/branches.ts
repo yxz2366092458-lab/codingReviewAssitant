@@ -9,6 +9,10 @@ export function assertBranchName(name: string): string {
   return branch;
 }
 
+export function startRef(branches: string[], fallback: string): string {
+  return branches.includes("release") ? "release" : fallback;
+}
+
 function runGit(cwd: string, args: string[]): Promise<string> {
   return enqueueGit(() => retryOnIndexLock(() => runGitOnce(cwd, args)));
 }
