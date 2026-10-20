@@ -383,7 +383,7 @@ function renderViewbar() {
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "点行号多选，Shift 连选。连续选区的正下方展开解释栏，一个文件里可以有多条。";
+  hint.textContent = "点行号多选，按住左键拖动或 Shift 连选同一侧的行。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
@@ -494,7 +494,8 @@ function lineRow(text, type, primary, secondary, side, path) {
     row.append(oldNum);
   }
   if (primary !== "") {
-    num.title = "点选，Shift 连选";
+    num.title = "点选、拖动或 Shift 连选";
+    num.addEventListener("mousedown", (event) => startLineDrag(event, row));
     num.addEventListener("click", (event) => pickLine(event, row));
   }
   row.append(num, code);
@@ -505,19 +506,69 @@ function lineKey(row) {
   return `${row.dataset.path}\0${row.dataset.side}\0${row.dataset.line}`;
 }
 
+let lineDrag = null;
+
+function sideLines(row) {
+  return [...document.querySelectorAll(`#diff .line[data-side="${row.dataset.side}"]`)].filter((item) => item.dataset.line && item.dataset.path === row.dataset.path);
+}
+
+function keysBetween(row, fromKey, toKey) {
+  const rows = sideLines(row);
+  const start = rows.findIndex((item) => lineKey(item) === fromKey);
+  const end = rows.findIndex((item) => lineKey(item) === toKey);
+  if (start < 0 || end < 0) return null;
+  const [from, to] = start < end ? [start, end] : [end, start];
+  return rows.slice(from, to + 1).map(lineKey);
+}
+
+function startLineDrag(event, row) {
+  if (event.button !== 0 || event.shiftKey) return;
+  lineDrag = { origin: row, moved: false };
+  document.body.classList.add("line-drag");
+  event.preventDefault();
+}
+
+function moveLineDrag(event) {
+  if (!lineDrag?.origin) return;
+  if (event.buttons !== 1) {
+    finishLineDrag();
+    return;
+  }
+  const current = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".line");
+  if (!current?.dataset.line || lineKey(current) === lineKey(lineDrag.origin)) return;
+  if (current.dataset.side !== lineDrag.origin.dataset.side || current.dataset.path !== lineDrag.origin.dataset.path) return;
+  const keys = keysBetween(lineDrag.origin, lineKey(lineDrag.origin), lineKey(current));
+  if (!keys) return;
+  lineDrag.moved = true;
+  state.picked = keys;
+  state.anchor = lineKey(lineDrag.origin);
+  paintPicked();
+}
+
+function finishLineDrag() {
+  if (!lineDrag) return;
+  const moved = lineDrag.moved;
+  lineDrag = null;
+  document.body.classList.remove("line-drag");
+  if (!moved) return;
+  placeExplainBars();
+  const swallow = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.removeEventListener("click", swallow, true);
+  };
+  document.addEventListener("click", swallow, true);
+  setTimeout(() => document.removeEventListener("click", swallow, true), 0);
+}
+
 function pickLine(event, row) {
   event.preventDefault();
   event.stopPropagation();
   if (!row.dataset.line) return;
   const key = lineKey(row);
   if (event.shiftKey && state.anchor) {
-    const rows = [...document.querySelectorAll(`#diff .line[data-side="${row.dataset.side}"]`)].filter((item) => item.dataset.line);
-    const start = rows.findIndex((item) => lineKey(item) === state.anchor);
-    const end = rows.findIndex((item) => lineKey(item) === key);
-    if (start >= 0 && end >= 0) {
-      const [from, to] = start < end ? [start, end] : [end, start];
-      state.picked = rows.slice(from, to + 1).map(lineKey);
-    }
+    const keys = keysBetween(row, state.anchor, key);
+    if (keys) state.picked = keys;
   } else if (state.picked.includes(key)) {
     state.picked = state.picked.filter((item) => item !== key);
   } else {
@@ -844,6 +895,9 @@ function showNotice(text) {
 function showError(error) {
   showNotice(error instanceof Error ? error.message : String(error));
 }
+
+document.addEventListener("mousemove", moveLineDrag);
+document.addEventListener("mouseup", finishLineDrag);
 
 document.addEventListener("click", (event) => {
   const scope = event.target.closest?.("[data-scope]");
