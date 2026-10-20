@@ -16,6 +16,7 @@ const state = {
   picked: [],
   anchor: "",
   explainThreads: [],
+  pendingExplain: {},
   drafts: {},
   viewSession: "",
   loadedExplainSession: "",
@@ -633,46 +634,66 @@ function explainDock(group) {
     item.textContent = turn.content;
     dock.append(item);
   }
+  if (state.pendingExplain[key]) dock.append(explainPending());
   const text = document.createElement("textarea");
   text.rows = 2;
   text.placeholder = "评论这些代码。留空则直接解释作用。";
   text.value = state.drafts[key] ?? "";
+  text.disabled = Boolean(state.pendingExplain[key]);
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = "解释";
-  button.addEventListener("click", () => void sendComment(group, text, button).catch(showError));
+  button.disabled = Boolean(state.pendingExplain[key]);
+  button.addEventListener("click", () => void sendComment(group, text).catch(showError));
   dock.append(text, button);
   return dock;
 }
 
-async function sendComment(group, text, button) {
+function explainPending() {
+  const row = document.createElement("p");
+  row.className = "explain-pending";
+  const icon = document.createElement("span");
+  icon.className = "spinner";
+  icon.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.textContent = "AI处理中";
+  row.append(icon, label);
+  return row;
+}
+
+async function sendComment(group, text) {
   const lines = group.lines?.length ? group.lines : linesBetween(group);
   if (!lines.length) {
     showNotice("先点行号选中要评论的代码。");
     return;
   }
-  button.disabled = true;
-  showNotice("正在让这个会话解释选中的代码。");
+  const key = anchorKey(group);
+  const comment = text.value;
+  state.drafts[key] = comment;
+  state.pendingExplain[key] = true;
+  placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
       method: "POST",
       body: JSON.stringify({
         lines,
-        comment: text.value,
+        comment,
         sessionId: state.loadedExplainSession,
         anchor: { path: group.path, side: group.side, start: group.start, end: group.end },
       }),
     });
     const anchor = result.anchor ?? group;
-    const key = anchorKey(anchor);
-    state.explainThreads = state.explainThreads.filter((item) => anchorKey(item) !== key);
+    const anchorId = anchorKey(anchor);
+    state.explainThreads = state.explainThreads.filter((item) => anchorKey(item) !== anchorId);
     state.explainThreads.push({ path: anchor.path, side: anchor.side, start: anchor.start, end: anchor.end, turns: result.turns ?? [] });
     if (result.sessionId) state.loadedExplainSession = result.sessionId;
-    delete state.drafts[key];
-    showNotice("");
+    delete state.drafts[anchorId];
+    delete state.pendingExplain[key];
     placeExplainBars();
-  } finally {
-    button.disabled = false;
+  } catch (error) {
+    delete state.pendingExplain[key];
+    placeExplainBars();
+    throw error;
   }
 }
 

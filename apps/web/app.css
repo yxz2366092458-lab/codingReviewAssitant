@@ -127,6 +127,25 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 }
 .inline-comment .ask, .inline-comment .explain { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.6; }
 .inline-comment .explain { background: var(--fill); padding: 8px 10px; }
+.explain-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  flex: none;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .comment { display: none; }
 .comment textarea {
   width: 100%;
