@@ -1,0 +1,42 @@
+packages/protocol/src/index.ts
+  s_fe57aaf6e489d1::t_9954b3644d06f8 39
+apps/daemon/src/server.ts
+  s_fe57aaf6e489d1::t_ffd6a3fe72746c 23
+  s_fe57aaf6e489d1::t_425a689a4897f2 273
+  s_fe57aaf6e489d1::t_2344d4c1a565e3 281-285
+apps/web/app.css
+  s_fe57aaf6e489d1::t_c8d2dac7888c1e 52
+apps/web/app.js
+  s_fe57aaf6e489d1::t_9c0edafcae0c7b 1002
+  s_fe57aaf6e489d1::t_bc93d939389439 969-972,976-977,980
+  s_fe57aaf6e489d1::t_ef030e6c9b7520 995-996,999
+  s_fe57aaf6e489d1::t_ea21bb741828ba 238
+apps/web/index.html
+  s_fe57aaf6e489d1::t_7423d380f14b71 77
+  s_fe57aaf6e489d1::t_ecbf4c5f30fcb5 7
+  s_fe57aaf6e489d1::t_aab64d4539df56 69
+apps/daemon/src/session/store.ts
+  s_fe57aaf6e489d1::t_d0eb024a620308 179
+  s_fe57aaf6e489d1::t_011576e24ddffc 53-54
+  s_fe57aaf6e489d1::t_0a72c6782f7282 192-199
+  s_fe57aaf6e489d1::t_578e94816f122b 119
+  s_fe57aaf6e489d1::t_3cb64e013d39f0 103-106
+  s_fe57aaf6e489d1::t_ad5b7cfa05d0ad 19
+  s_fe57aaf6e489d1::t_62170064d94ab1 172-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c0ba79e1ed5c31c6e76e646e521d44840caa40b3",
+  "prompts": {},
+  "sessions": {
+    "s_fe57aaf6e489d1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a14f4f03-f327-4e38-b0a4-7f552f77a59f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
