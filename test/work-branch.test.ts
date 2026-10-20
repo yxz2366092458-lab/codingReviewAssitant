@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { mergeFastForward } from "../apps/daemon/src/branches.ts";
+import { workBranchNames } from "../apps/daemon/src/work-branch.ts";
+
+function git(cwd: string, args: string[]) {
+  execFileSync("git", args, { cwd });
+}
+
+test("需求名分成需求分支和开发分支", () => {
+  assert.deepEqual(workBranchNames("登记多个工程"), {
+    requirement: "req/登记多个工程",
+    development: "dev/登记多个工程",
+  });
+});
+
+test("准入合并后，分支对比只剩下还没合并的提交", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-branches-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  const pair = workBranchNames("demo");
+  git(cwd, ["branch", pair.requirement, "main"]);
+  git(cwd, ["branch", pair.development, pair.requirement]);
+  git(cwd, ["switch", pair.development]);
+  writeFileSync(join(cwd, "b.txt"), "b\n");
+  git(cwd, ["add", "b.txt"]);
+  git(cwd, ["commit", "-m", "feature"]);
+  const before = execFileSync("git", ["diff", "--name-only", `${pair.requirement}...${pair.development}`], { cwd }).toString().trim();
+  assert.equal(before, "b.txt");
+  await mergeFastForward(cwd, pair.requirement, pair.development);
+  const after = execFileSync("git", ["diff", "--name-only", `${pair.requirement}...${pair.development}`], { cwd }).toString().trim();
+  assert.equal(after, "");
+  writeFileSync(join(cwd, "c.txt"), "c\n");
+  git(cwd, ["add", "c.txt"]);
+  git(cwd, ["commit", "-m", "next"]);
+  const next = execFileSync("git", ["diff", "--name-only", `${pair.requirement}...${pair.development}`], { cwd }).toString().trim();
+  assert.equal(next, "c.txt");
+});

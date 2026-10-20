@@ -82,7 +82,8 @@ function repoLabel(repo, repos) {
 }
 
 function renderBranches(status, names) {
-  $("base-ref").textContent = status.baseRef ? `${status.baseRef}...` : "";
+  const left = status.requirement || status.baseRef;
+  $("base-ref").textContent = left ? `${left}...` : "";
   const select = $("branch-select");
   const branches = names.length ? names : status.branch ? [status.branch] : [];
   const signature = `${branches.join("\n")}\0${status.branch}`;

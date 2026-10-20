@@ -28,6 +28,13 @@ if (command === "check-tool") {
   process.exit(denied ? 2 : 0);
 }
 
+if (command === "start") {
+  const name = rest.join(" ").trim();
+  const pair = await call("POST", `/repos/${await repoId()}/work-branches`, { name });
+  process.stdout.write(`${pair.requirement}\n${pair.development}\n`);
+  process.exit(0);
+}
+
 if (command === "intend") {
   const final = rest.includes("--final");
   const purpose = rest.filter((part) => part !== "--final").join(" ").trim();
@@ -61,7 +68,7 @@ if (command === "complete") {
   process.exit(1);
 }
 
-process.stderr.write("用法：review-gate intend \"作用\" [--final] | wait | complete | check-tool\n");
+process.stderr.write("用法：review-gate start \"需求名\" | intend \"作用\" [--final] | wait | complete | check-tool\n");
 process.exit(1);
 
 async function repoId() {

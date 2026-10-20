@@ -33,6 +33,7 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
+import { mergeWorkBranches, openWorkBranches, readWorkBranches } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { summarizeDiff } from "./summary-ai.ts";
@@ -207,7 +208,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
       const view = gateView(db, repo.id);
-      sendJson(res, 200, { ...status, baseRef: repo.base_ref, gate: view.state, lease: view.lease });
+      const pair = readWorkBranches(db, repo.id);
+      sendJson(res, 200, {
+        ...status,
+        baseRef: repo.base_ref,
+        requirement: pair?.requirement ?? null,
+        development: pair?.development ?? null,
+        gate: view.state,
+        lease: view.lease,
+      });
       return;
     }
     if (req.method === "GET" && rest === "branches") {
@@ -222,6 +231,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       publish(repo.id);
       const status = await repoStatus(repo.path, repo.base_ref);
       sendJson(res, 200, { branch: status.branch });
+      return;
+    }
+    if (req.method === "POST" && rest === "work-branches") {
+      const body = await readJson(req);
+      const view = gateView(db, repo.id);
+      if (view.state !== "locked") throw new GateError(409, "评审进行中，不能建立分支");
+      const pair = await openWorkBranches(db, repo.path, repo.id, repo.base_ref, String(body.name ?? ""));
+      publish(repo.id);
+      sendJson(res, 200, pair);
       return;
     }
     if (req.method === "POST" && rest === "base") {
@@ -260,6 +278,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "POST" && rest === "gate/ack") {
       const body = await readJson(req);
+      await mergeWorkBranches(db, repo.path, repo.id);
       acknowledge(db, String(body.sliceId ?? ""));
       publish(repo.id);
       sendJson(res, 200, gateView(db, repo.id));
@@ -339,7 +358,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null) {
     try {
-      if (scope === "branch") return await listRange(cwd, baseRef, (await git(cwd, ["rev-parse", "HEAD"])).trim());
+      if (scope === "branch") {
+        const pair = readWorkBranches(db, repoId);
+        if (pair) return await listRange(cwd, pair.requirement, pair.development);
+        return await listRange(cwd, baseRef, (await git(cwd, ["rev-parse", "HEAD"])).trim());
+      }
       if (scope === "staged") return await listStaged(cwd);
       if (scope === "unstaged") return await listUnstaged(cwd);
       const commit = commitFor(repoId, sliceId);
@@ -354,7 +377,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   }
 
   async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null): Promise<string[]> {
-    if (scope === "branch") return [`${baseRef}...${(await git(cwd, ["rev-parse", "HEAD"])).trim()}`];
+    if (scope === "branch") {
+      const pair = readWorkBranches(db, repoId);
+      if (pair) return [`${pair.requirement}...${pair.development}`];
+      return [`${baseRef}...${(await git(cwd, ["rev-parse", "HEAD"])).trim()}`];
+    }
     if (scope === "staged") return ["--cached"];
     if (scope === "unstaged") return [];
     const commit = commitFor(repoId, sliceId);
