@@ -16,6 +16,7 @@ const state = {
   picked: [],
   explainThreads: [],
   explainOpen: {},
+  explainFolded: {},
   pendingExplain: {},
   drafts: {},
   viewSession: "",
@@ -160,6 +161,7 @@ function resetView() {
   state.picked = [];
   state.explainThreads = [];
   state.explainOpen = {};
+  state.explainFolded = {};
   state.pendingExplain = {};
   state.drafts = {};
   state.viewSession = "";
@@ -675,21 +677,35 @@ function placeExplainBars() {
 
 function explainDock(group) {
   const key = anchorKey(group);
+  const folded = Boolean(state.explainFolded[key]);
   const dock = document.createElement("div");
-  dock.className = "inline-comment";
+  dock.className = folded ? "inline-comment folded" : "inline-comment";
   dock.dataset.anchor = key;
+  const head = document.createElement("div");
+  head.className = "explain-head";
   const kicker = document.createElement("p");
   kicker.className = "kicker";
   kicker.textContent = group.start === group.end ? `第 ${group.start} 行` : `第 ${group.start}–${group.end} 行`;
-  dock.append(kicker);
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "explain-fold";
+  toggle.textContent = folded ? "展开" : "收起";
+  toggle.setAttribute("aria-expanded", String(!folded));
+  toggle.addEventListener("click", () => {
+    state.explainFolded[key] = !folded;
+    placeExplainBars();
+  });
+  head.append(kicker, toggle);
+  const body = document.createElement("div");
+  body.className = "explain-body";
   for (const turn of group.turns ?? []) {
     const item = document.createElement("p");
     item.className = turn.role === "assistant" ? "explain" : "ask";
     item.textContent = turn.content;
-    dock.append(item);
+    body.append(item);
   }
   const pending = state.pendingExplain[key];
-  if (pending === "comment") dock.append(explainPending());
+  if (pending === "comment") body.append(explainPending());
   const text = document.createElement("textarea");
   text.rows = 2;
   text.placeholder = "写下对这段代码的评论。";
@@ -708,8 +724,9 @@ function explainDock(group) {
   const actions = document.createElement("div");
   actions.className = "explain-actions";
   actions.append(comment, explain);
-  dock.append(text, actions);
-  if (state.explainOpen[key]) dock.append(explainBubble(group, state.explainOpen[key]));
+  body.append(text, actions);
+  if (state.explainOpen[key]) body.append(explainBubble(group, state.explainOpen[key]));
+  dock.append(head, body);
   return dock;
 }
 

@@ -115,6 +115,10 @@ body.line-drag { user-select: none; }
   border-left: 3px solid var(--accent);
   background: var(--panel);
 }
+.explain-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.explain-head .kicker { margin: 0; }
+.explain-body { margin-top: 8px; }
+.inline-comment.folded .explain-body { display: none; }
 .inline-comment textarea {
   width: 100%;
   box-sizing: border-box;
