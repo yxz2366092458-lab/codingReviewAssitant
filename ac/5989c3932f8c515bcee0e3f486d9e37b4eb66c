@@ -1,0 +1,24 @@
+apps/web/index.html
+  s_2c4704268752b9::t_5ced450f3613a6 20-23
+apps/web/app.js
+  s_2c4704268752b9::t_6f3bb53bc87e85 149
+  s_2c4704268752b9::t_053ccd8a9b52f5 171
+  s_2c4704268752b9::t_66040a312226a8 163-164
+  s_2c4704268752b9::t_f21a162181c5cb 76-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ac5989c3932f8c515bcee0e3f486d9e37b4eb66c",
+  "prompts": {},
+  "sessions": {
+    "s_2c4704268752b9": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a162d444-4841-49b2-bdab-23ee32a936f4",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
