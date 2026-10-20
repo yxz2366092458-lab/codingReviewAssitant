@@ -16,6 +16,7 @@ const state = {
   picked: [],
   anchor: "",
   explainThreads: [],
+  explainOpen: {},
   pendingExplain: {},
   drafts: {},
   viewSession: "",
@@ -160,6 +161,8 @@ function resetView() {
   state.picked = [];
   state.anchor = "";
   state.explainThreads = [];
+  state.explainOpen = {};
+  state.pendingExplain = {};
   state.drafts = {};
   state.viewSession = "";
   state.loadedExplainSession = "";
@@ -243,6 +246,7 @@ async function loadPanel() {
   if (active !== state.loadedExplainSession) {
     const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
     state.explainThreads = thread.threads ?? [];
+    restoreExplainBubbles();
     state.loadedExplainSession = active;
   }
   state.signature = signature;
@@ -656,12 +660,13 @@ function placeExplainBars() {
   const bars = new Map();
   for (const thread of state.explainThreads) {
     if (!thread.path) continue;
-    bars.set(anchorKey(thread), { ...thread, lines: thread.lines ?? [] });
+    bars.set(anchorKey(thread), { ...thread, lines: thread.lines ?? [], modes: thread.modes ?? {} });
   }
   for (const group of contiguousGroups(selectedLines())) {
     const key = anchorKey(group);
-    const existing = bars.get(key) ?? { ...group, turns: [] };
+    const existing = bars.get(key) ?? { ...group, turns: [], modes: {} };
     existing.lines = group.lines;
+    existing.modes = existing.modes ?? {};
     bars.set(key, existing);
   }
   for (const group of bars.values()) {
@@ -685,19 +690,139 @@ function explainDock(group) {
     item.textContent = turn.content;
     dock.append(item);
   }
-  if (state.pendingExplain[key]) dock.append(explainPending());
+  const pending = state.pendingExplain[key];
+  if (pending === "comment") dock.append(explainPending());
   const text = document.createElement("textarea");
   text.rows = 2;
-  text.placeholder = "评论这些代码。留空则直接解释作用。";
+  text.placeholder = "写下对这段代码的评论。";
   text.value = state.drafts[key] ?? "";
-  text.disabled = Boolean(state.pendingExplain[key]);
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = "解释";
-  button.disabled = Boolean(state.pendingExplain[key]);
-  button.addEventListener("click", () => void sendComment(group, text).catch(showError));
-  dock.append(text, button);
+  text.disabled = Boolean(pending);
+  const comment = document.createElement("button");
+  comment.type = "button";
+  comment.textContent = "评论";
+  comment.disabled = Boolean(pending);
+  comment.addEventListener("click", () => void sendComment(group, text).catch(showError));
+  const explain = document.createElement("button");
+  explain.type = "button";
+  explain.textContent = "解释";
+  explain.disabled = Boolean(pending);
+  explain.addEventListener("click", () => void openExplain(group).catch(showError));
+  const actions = document.createElement("div");
+  actions.className = "explain-actions";
+  actions.append(comment, explain);
+  dock.append(text, actions);
+  if (state.explainOpen[key]) dock.append(explainBubble(group, state.explainOpen[key]));
   return dock;
+}
+
+function explainBubble(group, mode) {
+  const key = anchorKey(group);
+  const bubble = document.createElement("div");
+  bubble.className = "explain-bubble";
+  const switcher = document.createElement("div");
+  switcher.className = "explain-switch";
+  for (const [value, label] of [["pseudo", "伪代码"], ["line", "按行解释"]]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.classList.toggle("active", mode === value);
+    button.disabled = Boolean(state.pendingExplain[key]);
+    button.addEventListener("click", () => void chooseExplain(group, value).catch(showError));
+    switcher.append(button);
+  }
+  bubble.append(switcher);
+  if (state.pendingExplain[key] === mode) bubble.append(explainPending());
+  const content = group.modes?.[mode] || threadModes(key)?.[mode] || "";
+  if (content) {
+    const body = document.createElement("p");
+    body.className = "explain";
+    body.textContent = content;
+    bubble.append(body);
+  }
+  return bubble;
+}
+
+function threadModes(key) {
+  return state.explainThreads.find((item) => anchorKey(item) === key)?.modes;
+}
+
+function restoreExplainBubbles() {
+  for (const thread of state.explainThreads) {
+    const key = anchorKey(thread);
+    if (state.explainOpen[key]) continue;
+    if (thread.modes?.pseudo) state.explainOpen[key] = "pseudo";
+    else if (thread.modes?.line) state.explainOpen[key] = "line";
+  }
+}
+
+async function openExplain(group) {
+  const key = anchorKey(group);
+  if (!state.explainOpen[key]) state.explainOpen[key] = "pseudo";
+  const mode = state.explainOpen[key];
+  if (threadModes(key)?.[mode] || state.pendingExplain[key]) {
+    placeExplainBars();
+    return;
+  }
+  await requestExplain(group, mode);
+}
+
+async function chooseExplain(group, mode) {
+  const key = anchorKey(group);
+  if (state.pendingExplain[key]) return;
+  state.explainOpen[key] = mode;
+  if (threadModes(key)?.[mode]) {
+    placeExplainBars();
+    return;
+  }
+  await requestExplain(group, mode);
+}
+
+async function requestExplain(group, mode) {
+  const lines = group.lines?.length ? group.lines : linesBetween(group);
+  if (!lines.length) {
+    showNotice("先点行号选中要解释的代码。");
+    return;
+  }
+  const key = anchorKey(group);
+  state.pendingExplain[key] = mode;
+  placeExplainBars();
+  try {
+    const result = await api(`/repos/${state.repoId}/explain`, {
+      method: "POST",
+      body: JSON.stringify({
+        lines,
+        mode,
+        sessionId: state.loadedExplainSession,
+        anchor: { path: group.path, side: group.side, start: group.start, end: group.end },
+      }),
+    });
+    rememberThread(result, group);
+    delete state.pendingExplain[key];
+    placeExplainBars();
+  } catch (error) {
+    delete state.pendingExplain[key];
+    placeExplainBars();
+    throw error;
+  }
+}
+
+function rememberThread(result, group) {
+  const anchor = result.anchor ?? group;
+  const anchorId = anchorKey(anchor);
+  const current = state.explainThreads.find((item) => anchorKey(item) === anchorId);
+  const modes = { ...(current?.modes ?? group.modes ?? {}) };
+  if (result.modes) Object.assign(modes, result.modes);
+  if (result.mode && result.reply) modes[result.mode] = result.reply;
+  state.explainThreads = state.explainThreads.filter((item) => anchorKey(item) !== anchorId);
+  state.explainThreads.push({
+    path: anchor.path,
+    side: anchor.side,
+    start: anchor.start,
+    end: anchor.end,
+    turns: result.turns ?? current?.turns ?? [],
+    modes,
+  });
+  if (result.sessionId) state.loadedExplainSession = result.sessionId;
 }
 
 function explainPending() {
@@ -719,9 +844,13 @@ async function sendComment(group, text) {
     return;
   }
   const key = anchorKey(group);
-  const comment = text.value;
+  const comment = text.value.trim();
+  if (!comment) {
+    showNotice("先写下评论。");
+    return;
+  }
   state.drafts[key] = comment;
-  state.pendingExplain[key] = true;
+  state.pendingExplain[key] = "comment";
   placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
@@ -733,12 +862,8 @@ async function sendComment(group, text) {
         anchor: { path: group.path, side: group.side, start: group.start, end: group.end },
       }),
     });
-    const anchor = result.anchor ?? group;
-    const anchorId = anchorKey(anchor);
-    state.explainThreads = state.explainThreads.filter((item) => anchorKey(item) !== anchorId);
-    state.explainThreads.push({ path: anchor.path, side: anchor.side, start: anchor.start, end: anchor.end, turns: result.turns ?? [] });
-    if (result.sessionId) state.loadedExplainSession = result.sessionId;
-    delete state.drafts[anchorId];
+    rememberThread(result, group);
+    delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
     placeExplainBars();
   } catch (error) {

@@ -20,8 +20,16 @@ export type ExplainAnchor = {
   end: number;
 };
 
+export type ExplainStyle = "pseudo" | "line";
+
+export type ExplainModes = {
+  pseudo?: string;
+  line?: string;
+};
+
 export type ExplainThread = ExplainAnchor & {
   turns: ExplainTurn[];
+  modes: ExplainModes;
 };
 
 const blankAnchor: ExplainAnchor = { path: "", side: "head", start: 0, end: 0 };
@@ -108,6 +116,16 @@ export function userTurn(lines: CodeLine[], comment: string): string {
   return `${note}\n\n${body}`;
 }
 
+export function explainPrompt(lines: CodeLine[], style: ExplainStyle): string {
+  const body = lines
+    .map((line) => `${line.path}:${line.line}（${line.side === "base" ? "基准" : "改后"}）${line.text}`)
+    .join("\n");
+  const task = style === "pseudo"
+    ? "用中文写出伪代码。伪代码要能看出这些行的步骤和分支。"
+    : "用中文按行解释。每一行都说明它在做什么。";
+  return `你是代码评审助手。只根据给出的代码行${task}不要评价好坏，不要编造没出现的行为。\n\n${body}`;
+}
+
 export function sessionPrompt(history: ExplainTurn[], lines: CodeLine[], comment: string): string {
   const prior = history.map((turn) => `${turn.role === "user" ? "人" : "AI"}：${turn.content}`).join("\n\n");
   return `你是代码评审助手，正在同一会话里回答人的评论。只根据给出的代码行解释它们在做什么。用中文，先说这些行共同完成的事，再按行说明各自的作用。不要评价好坏，不要编造没出现的行为。
@@ -188,9 +206,81 @@ export function loadThreads(db: DatabaseSync, repoId: string, sessionId: string)
       last.turns.push(turn);
       continue;
     }
-    threads.push({ path: row.path, side, start: row.start_line, end: row.end_line, turns: [turn] });
+    threads.push({ path: row.path, side, start: row.start_line, end: row.end_line, turns: [turn], modes: {} });
+  }
+  const modes = loadModeMap(db, repoId, sessionId);
+  for (const thread of threads) {
+    const key = modeKey(thread);
+    thread.modes = modes.get(key) ?? {};
+    modes.delete(key);
+  }
+  for (const [key, value] of modes) {
+    const [path, sideName, startText, endText] = key.split("\0");
+    threads.push({
+      path,
+      side: sideName === "base" ? "base" : "head",
+      start: Number(startText),
+      end: Number(endText),
+      turns: [],
+      modes: value,
+    });
   }
   return threads;
+}
+
+function modeKey(anchor: ExplainAnchor): string {
+  return `${anchor.path}\0${anchor.side}\0${anchor.start}\0${anchor.end}`;
+}
+
+function ensureExplainModes(db: DatabaseSync): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS explain_modes (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    side TEXT NOT NULL,
+    start_line INTEGER NOT NULL,
+    end_line INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    content TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id, path, side, start_line, end_line, mode)
+  )`);
+}
+
+function loadModeMap(db: DatabaseSync, repoId: string, sessionId: string): Map<string, ExplainModes> {
+  ensureExplainModes(db);
+  const rows = db.prepare(
+    `SELECT path, side, start_line, end_line, mode, content FROM explain_modes
+     WHERE repo_id = ? AND session_id = ?`,
+  ).all(repoId, sessionId) as Array<{ path: string; side: string; start_line: number; end_line: number; mode: string; content: string }>;
+  const modes = new Map<string, ExplainModes>();
+  for (const row of rows) {
+    if (row.mode !== "pseudo" && row.mode !== "line") continue;
+    const key = `${row.path}\0${row.side}\0${row.start_line}\0${row.end_line}`;
+    const current = modes.get(key) ?? {};
+    current[row.mode] = row.content;
+    modes.set(key, current);
+  }
+  return modes;
+}
+
+export function loadExplainModes(db: DatabaseSync, repoId: string, sessionId: string, anchor: ExplainAnchor): ExplainModes {
+  return loadModeMap(db, repoId, sessionId).get(modeKey(anchor)) ?? {};
+}
+
+export function saveExplainMode(
+  db: DatabaseSync,
+  repoId: string,
+  sessionId: string,
+  anchor: ExplainAnchor,
+  style: ExplainStyle,
+  content: string,
+): void {
+  ensureExplainModes(db);
+  db.prepare(
+    `INSERT INTO explain_modes (repo_id, session_id, path, side, start_line, end_line, mode, content)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(repo_id, session_id, path, side, start_line, end_line, mode) DO UPDATE SET content = excluded.content`,
+  ).run(repoId, sessionId, anchor.path, anchor.side, anchor.start, anchor.end, style, content);
 }
 
 export function saveThread(db: DatabaseSync, repoId: string, sessionId: string, anchor: ExplainAnchor, turns: ExplainTurn[]): void {
@@ -245,4 +335,32 @@ export async function explainInSession(
   const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: reply }].slice(-12);
   saveThread(db, repoId, sessionId, target, turns);
   return { reply, turns, anchor: target };
+}
+
+export async function explainSelection(
+  db: DatabaseSync,
+  repoId: string,
+  sessionId: string,
+  lines: CodeLine[],
+  style: ExplainStyle,
+  anchor?: ExplainAnchor,
+): Promise<{ reply: string; anchor: ExplainAnchor; mode: ExplainStyle; cached: boolean; modes: ExplainModes }> {
+  if (style !== "pseudo" && style !== "line") throw new Error("解释方式无效");
+  if (!lines.length) throw new Error("先选中代码行");
+  const target = anchor ?? anchorFor(lines);
+  if (!target) throw new Error("请选择同一侧连续的代码行");
+  const modes = loadExplainModes(db, repoId, sessionId, target);
+  const cached = modes[style]?.trim() ?? "";
+  if (cached) return { reply: cached, anchor: target, mode: style, cached: true, modes };
+  let reply = "";
+  try {
+    reply = (await completePrompt(explainPrompt(lines, style))).trim();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "总结失败" || message === "总结为空") throw new Error("解释失败");
+    throw error;
+  }
+  if (!reply) throw new Error("解释失败");
+  saveExplainMode(db, repoId, sessionId, target, style, reply);
+  return { reply, anchor: target, mode: style, cached: false, modes: { ...modes, [style]: reply } };
 }

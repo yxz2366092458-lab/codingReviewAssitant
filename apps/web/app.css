@@ -128,6 +128,10 @@ body.line-drag { user-select: none; }
 }
 .inline-comment .ask, .inline-comment .explain { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.6; }
 .inline-comment .explain { background: var(--fill); padding: 8px 10px; }
+.explain-actions, .explain-switch { display: flex; gap: 8px; }
+.explain-actions { margin-top: 8px; }
+.explain-bubble { margin-top: 8px; }
+.explain-switch { margin-bottom: 8px; }
 .explain-pending {
   display: flex;
   align-items: center;

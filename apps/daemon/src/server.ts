@@ -36,7 +36,7 @@ import {
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
-import { explainInSession, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
+import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
 import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
@@ -384,7 +384,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const lines = normalizeLines(body.lines);
       if (!lines.length) throw new GateError(400, "先选中代码行");
       const session = explainSession(repo.id, await headBranch(repo.path), String(body.sessionId ?? ""));
-      const result = await explainInSession(db, repo.id, session, lines, String(body.comment ?? ""), readAnchor(body.anchor) ?? undefined);
+      const anchor = readAnchor(body.anchor) ?? undefined;
+      if (body.mode === "pseudo" || body.mode === "line") {
+        const result = await explainSelection(db, repo.id, session, lines, body.mode, anchor);
+        sendJson(res, 200, { sessionId: session, ...result });
+        return;
+      }
+      const comment = String(body.comment ?? "").trim();
+      if (!comment) throw new GateError(400, "先写下评论");
+      const result = await explainInSession(db, repo.id, session, lines, comment, anchor);
       sendJson(res, 200, { sessionId: session, ...result });
       return;
     }

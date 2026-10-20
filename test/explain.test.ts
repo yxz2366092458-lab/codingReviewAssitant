@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { loadThreads, loadTurns, normalizeLines, readAnchor, remember, resolveExplainSession, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
 import { currentSessionId, listWorkSessions, readSessionBranches } from "../apps/daemon/src/work-branch.ts";
 
 const lines = [{ path: "apps/web/app.js", side: "head" as const, line: 12, text: "return total;" }];
@@ -65,7 +65,7 @@ test("当前开发分支对应这次会话", () => {
   assert.equal(currentSessionId(db, "repo", "dev/c39dda955a2742ce"), "c39dda95-5a27-42ce-9123-194b6979821f");
 });
 
-test("历史会话单独保留解释，不会串到当前会话", () => {
+test("历史会话单独保留解释，不会串到当前会话", async () => {
   assert.equal(resolveExplainSession("old-session", ["old-session", "new-session"], "new-session"), "old-session");
   assert.equal(resolveExplainSession("", ["old-session", "new-session"], "new-session"), "new-session");
   assert.throws(() => resolveExplainSession("missing", ["old-session"], "new-session"), /没有这个会话/);
@@ -101,4 +101,21 @@ test("历史会话单独保留解释，不会串到当前会话", () => {
   saveThread(db, "repo", "old-session", lower, [{ role: "assistant", content: "下面的解释" }]);
   const threads = loadThreads(db, "repo", "old-session");
   assert.deepEqual(threads.map((item) => item.turns[0]?.content), ["上面的解释", "下面的解释"]);
+  saveExplainMode(db, "repo", "old-session", upper, "pseudo", "返回合计");
+  const stored = await explainSelection(db, "repo", "old-session", top, "pseudo", upper);
+  assert.equal(stored.cached, true);
+  assert.equal(stored.reply, "返回合计");
+  assert.equal(stored.modes.line, undefined);
+  const visible = loadThreads(db, "repo", "old-session").find((item) => item.start === 10);
+  assert.equal(visible?.modes.pseudo, "返回合计");
+});
+
+test("伪代码和按行解释分开生成，默认提示是伪代码", () => {
+  const pseudo = explainPrompt(lines, "pseudo");
+  const byLine = explainPrompt(lines, "line");
+  assert.match(pseudo, /伪代码/);
+  assert.match(pseudo, /apps\/web\/app\.js:12/);
+  assert.doesNotMatch(pseudo, /按行解释/);
+  assert.match(byLine, /按行解释/);
+  assert.doesNotMatch(byLine, /伪代码/);
 });
