@@ -1,0 +1,25 @@
+apps/daemon/src/explain.ts
+  s_d45214d18031cb::t_1e3ebe2f29c8ed 376
+  s_d45214d18031cb::t_9230363a8bd414 371-374
+  s_d45214d18031cb::t_4be88864feb52c 129-132,135-149,155-170
+  s_d45214d18031cb::t_acfdf62e916647 171-172
+test/explain.test.ts
+  s_d45214d18031cb::t_01cf512c02fb56 30-41
+  s_d45214d18031cb::t_b5169aac3356c4 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ca895bcef82a7f2c4a487f8fa8daa4cce68ec276",
+  "prompts": {},
+  "sessions": {
+    "s_d45214d18031cb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "078c8995-31c5-475b-aa10-b60d97dfca7a",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
