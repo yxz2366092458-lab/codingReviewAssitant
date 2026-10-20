@@ -1,0 +1,22 @@
+apps/daemon/src/work-branch.ts
+  s_5f3d8f56fde9b6::t_c39303391d711d 57
+test/work-branch.test.ts
+  s_5f3d8f56fde9b6::t_e15f6a8cb14f45 6,9
+  s_5f3d8f56fde9b6::t_a431612ce40d5f 55-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "13f9b210a03a87c259f7966fef833d7655580daa",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
