@@ -6,17 +6,49 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { mergeFastForward } from "../apps/daemon/src/branches.ts";
-import { admitSession, mergeWorkBranches, sessionBranchNames, sessionPhase, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { admitSession, composerName, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
 }
 
-test("会话编号分成需求分支和开发分支", () => {
-  assert.deepEqual(sessionBranchNames("c39dda95-5a27-42ce-9123-194b6979821f"), {
-    requirement: "req/c39dda955a2742ce",
+test("需求分支用会话总结，开发分支仍用会话编号", () => {
+  assert.deepEqual(sessionBranchNames("c39dda95-5a27-42ce-9123-194b6979821f", "User project and branch management"), {
+    requirement: "req/User-project-and-branch-management",
     development: "dev/c39dda955a2742ce",
   });
+});
+
+test("会话标题和第一条用户请求都能当作会话总结", () => {
+  const file = join(mkdtempSync(join(tmpdir(), "review-summary-")), "state.vscdb");
+  const db = new DatabaseSync(file);
+  db.exec("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)");
+  db.prepare("INSERT INTO composerHeaders (composerId, value) VALUES (?, ?)").run(
+    "c39dda95-5a27-42ce-9123-194b6979821f",
+    JSON.stringify({ name: "  User project and branch management  " }),
+  );
+  db.close();
+  assert.equal(composerName("c39dda95-5a27-42ce-9123-194b6979821f", file), "User project and branch management");
+  const ask = userAskFromTranscript(
+    `${JSON.stringify({ message: { content: [{ type: "text", text: "<user_query>\n把需求分支改成会话总结\n</user_query>" }] } })}\n`,
+  );
+  assert.equal(ask, "把需求分支改成会话总结");
+});
+
+test("新建会话分支时需求分支取会话总结", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-session-branch-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  const db = new DatabaseSync(":memory:");
+  const session = "c39dda95-5a27-42ce-9123-194b6979821f";
+  const pair = await openWorkBranches(db, cwd, "repo", "HEAD", session, true, "User project and branch management");
+  assert.equal(pair.requirement, "req/User-project-and-branch-management");
+  assert.equal(pair.development, "dev/c39dda955a2742ce");
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), pair.development);
 });
 
 test("需求名分成需求分支和开发分支", () => {

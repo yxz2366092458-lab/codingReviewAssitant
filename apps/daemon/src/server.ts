@@ -37,7 +37,7 @@ import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
-import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
+import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -271,6 +271,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       if (!gateView(db, repo.id).slice) {
         const session = String(body.session ?? "").trim();
         if (!session) throw new GateError(400, "没有会话，不能建立分支");
+        if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
+          throw new GateError(400, "没有会话总结");
+        }
         await openWorkBranches(db, repo.path, repo.id, "HEAD", session, true);
       }
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));

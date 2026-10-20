@@ -1,5 +1,8 @@
-import type { DatabaseSync } from "node:sqlite";
-import { checkoutBranch, createBranch, mergeFastForward } from "./branches.ts";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { checkoutBranch, createBranch, listLocalBranches, mergeFastForward } from "./branches.ts";
 
 export function workBranchNames(title: string): { requirement: string; development: string } {
   const slug = title.trim().replace(/\s+/g, "-").replace(/\./g, "").slice(0, 48);
@@ -7,10 +10,84 @@ export function workBranchNames(title: string): { requirement: string; developme
   return { requirement: `req/${slug}`, development: `dev/${slug}` };
 }
 
-export function sessionBranchNames(sessionId: string): { requirement: string; development: string } {
+export function sessionBranchNames(sessionId: string, summary: string): { requirement: string; development: string } {
   const slug = sessionId.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
   if (slug.length < 8) throw new Error("会话无效");
-  return { requirement: `req/${slug}`, development: `dev/${slug}` };
+  return { requirement: requirementBranchName(summary), development: `dev/${slug}` };
+}
+
+export function requirementBranchName(summary: string): string {
+  const slug = summary
+    .trim()
+    .replace(/[\u0000-\u001f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[.~^:?*[\]\\@{}<>"'`|/]+/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 48)
+    .replace(/[-.]+$/g, "");
+  if (!slug) throw new Error("会话总结不能为空");
+  return `req/${slug}`;
+}
+
+export function composerName(sessionId: string, file = cursorStateFile()): string {
+  const id = sessionId.trim();
+  if (!id || !existsSync(file)) return "";
+  let db: DatabaseSync | null = null;
+  try {
+    db = new DatabaseSync(file, { readOnly: true });
+    const row = db.prepare("SELECT value FROM composerHeaders WHERE composerId = ?").get(id) as { value?: string } | undefined;
+    if (!row?.value) return "";
+    const parsed = JSON.parse(row.value) as { name?: unknown };
+    return typeof parsed.name === "string" ? parsed.name.trim() : "";
+  } catch {
+    return "";
+  } finally {
+    db?.close();
+  }
+}
+
+export function userAskFromTranscript(text: string): string {
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const content = (parsed as { message?: { content?: unknown } }).message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const chunk of content) {
+      if (!chunk || typeof chunk !== "object") continue;
+      const raw = (chunk as { text?: unknown }).text;
+      if (typeof raw !== "string") continue;
+      const match = raw.match(/<user_query>\s*([\s\S]*?)\s*<\/user_query>/);
+      const ask = match?.[1]?.trim() ?? "";
+      if (ask) return ask.replace(/\s+/g, " ");
+    }
+  }
+  return "";
+}
+
+export function readSessionSummary(sessionId: string): string {
+  return composerName(sessionId) || firstUserAsk(sessionId);
+}
+
+function cursorStateFile(): string {
+  return join(homedir(), "Library/Application Support/Cursor/User/globalStorage/state.vscdb");
+}
+
+function firstUserAsk(sessionId: string): string {
+  const id = sessionId.trim();
+  const root = join(homedir(), ".cursor", "projects");
+  if (!id || !existsSync(root)) return "";
+  for (const project of readdirSync(root)) {
+    const file = join(root, project, "agent-transcripts", id, `${id}.jsonl`);
+    if (!existsSync(file)) continue;
+    return userAskFromTranscript(readFileSync(file, "utf8"));
+  }
+  return "";
 }
 
 export function readWorkBranches(
@@ -38,9 +115,21 @@ export async function openWorkBranches(
   baseRef: string,
   title: string,
   fromSession = false,
+  summaryText = "",
 ): Promise<{ requirement: string; development: string }> {
-  const pair = fromSession ? sessionBranchNames(title) : workBranchNames(title);
   const sessionId = fromSession ? title.trim() : "";
+  if (fromSession) {
+    const existing = readSessionBranches(db, repoId, sessionId);
+    if (existing) {
+      await checkoutBranch(cwd, existing.development);
+      return existing;
+    }
+  }
+  const summary = fromSession ? summaryText.trim() || readSessionSummary(sessionId) : "";
+  if (fromSession && !summary) throw new Error("没有会话总结");
+  const named = fromSession ? sessionBranchNames(sessionId, summary) : workBranchNames(title);
+  const requirement = fromSession ? await availableRequirement(db, cwd, repoId, named.requirement) : named.requirement;
+  const pair = { requirement, development: named.development };
   await createBranch(cwd, pair.requirement, baseRef);
   await createBranch(cwd, pair.development, pair.requirement);
   await checkoutBranch(cwd, pair.development);
@@ -121,6 +210,18 @@ export function admitSession(db: DatabaseSync, repoId: string, headBranch: strin
     repoId,
     row.development,
   );
+}
+
+async function availableRequirement(db: DatabaseSync, cwd: string, repoId: string, name: string): Promise<string> {
+  ensureWorkBranches(db);
+  const rows = db.prepare("SELECT requirement FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{ requirement: string }>;
+  const used = new Set([...rows.map((row) => row.requirement), ...(await listLocalBranches(cwd))]);
+  if (!used.has(name)) return name;
+  for (let index = 2; index < 100; index += 1) {
+    const next = `${name}-${index}`;
+    if (!used.has(next)) return next;
+  }
+  throw new Error("需求分支重名");
 }
 
 function readRecord(db: DatabaseSync, repoId: string, headBranch: string) {
