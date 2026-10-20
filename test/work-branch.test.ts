@@ -5,12 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { mergeFastForward } from "../apps/daemon/src/branches.ts";
+import { mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
 import { admitSession, composerName, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
 }
+
+test("有 release 分支时从 release 启动，否则沿用原来的基准", () => {
+  assert.equal(startRef(["main", "release", "dev/demo"], "HEAD"), "release");
+  assert.equal(startRef(["main", "dev/demo"], "HEAD"), "HEAD");
+});
 
 test("需求分支用会话总结，开发分支仍用会话编号", () => {
   assert.deepEqual(sessionBranchNames("c39dda95-5a27-42ce-9123-194b6979821f", "User project and branch management"), {

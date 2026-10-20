@@ -33,7 +33,7 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
-import { checkoutBranch, listLocalBranches } from "./branches.ts";
+import { checkoutBranch, listLocalBranches, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
@@ -59,6 +59,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   const db = openStore();
   const token = randomBytes(32).toString("hex");
   const repoPath = await topLevel(resolve(options.repoPath));
+  await beginOnRelease();
   const clients = new Set<SocketClient>();
   let fingerprint = "";
   let stopped = false;
@@ -245,7 +246,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const body = await readJson(req);
       const view = gateView(db, repo.id);
       if (view.state !== "locked") throw new GateError(409, "评审进行中，不能建立分支");
-      const pair = await openWorkBranches(db, repo.path, repo.id, repo.base_ref, String(body.name ?? ""));
+      const pair = await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, repo.base_ref), String(body.name ?? ""));
       publish(repo.id);
       sendJson(res, 200, pair);
       return;
@@ -275,7 +276,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
           throw new GateError(400, "没有会话总结");
         }
-        await openWorkBranches(db, repo.path, repo.id, "HEAD", session, true);
+        await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
       }
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
       if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
@@ -411,6 +412,25 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   function present(view: ReturnType<typeof gateView>) {
     const sliceId = view.slice?.sliceId ?? null;
     return { ...view, finalRound: sliceId ? readFinalRound(db, sliceId) : null };
+  }
+
+  async function beginOnRelease(): Promise<void> {
+    const registered = await registerRepo(repoPath);
+    const next = await branchBase(repoPath, registered.baseRef);
+    if (next !== "release") return;
+    if (registered.baseRef !== "release") setBaseRef(db, registered.repoId, "release");
+    if (gateView(db, registered.repoId).state !== "locked") return;
+    try {
+      const current = (await git(repoPath, ["symbolic-ref", "--short", "HEAD"])).trim();
+      if (current !== "release") await checkoutBranch(repoPath, "release");
+    } catch {
+      return;
+    }
+  }
+
+  async function branchBase(path: string, fallback: string): Promise<string> {
+    if (path !== repoPath) return fallback;
+    return startRef(await listLocalBranches(path), fallback);
   }
 
   async function registerRepo(inputPath: string): Promise<{ repoId: string; branch: string; baseRef: string }> {
