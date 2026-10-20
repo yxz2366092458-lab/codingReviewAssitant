@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { enqueueGit, retryOnIndexLock } from "./git/lock.ts";
 
 export function assertBranchName(name: string): string {
   const branch = name.trim();
@@ -9,6 +10,10 @@ export function assertBranchName(name: string): string {
 }
 
 function runGit(cwd: string, args: string[]): Promise<string> {
+  return enqueueGit(() => retryOnIndexLock(() => runGitOnce(cwd, args)));
+}
+
+function runGitOnce(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
@@ -16,7 +21,8 @@ function runGit(cwd: string, args: string[]): Promise<string> {
       { cwd, timeout: 15000, env: { ...process.env, GIT_PAGER: "cat" } },
       (error, stdout, stderr) => {
         if (error) {
-          reject(new Error((stderr?.toString() || error.message).trim() || "切换分支失败"));
+          const detail = (stderr?.toString() || stdout?.toString() || error.message).trim();
+          reject(new Error(detail || "切换分支失败"));
           return;
         }
         resolve(stdout.toString());
@@ -62,4 +68,24 @@ export async function mergeFastForward(cwd: string, target: string, source: stri
   } finally {
     if (current) await runGit(cwd, ["switch", "--", current]);
   }
+}
+
+export async function mergeBranch(cwd: string, target: string, source: string): Promise<void> {
+  const into = assertBranchName(target);
+  const from = assertBranchName(source);
+  if (into === from) return;
+  const branches = await listLocalBranches(cwd);
+  if (!branches.includes(into) || !branches.includes(from)) throw new Error("没有这个本地分支");
+  const current = (await runGit(cwd, ["branch", "--show-current"])).trim();
+  await runGit(cwd, ["switch", "--", into]);
+  let failed: unknown;
+  try {
+    await runGit(cwd, ["merge", "--no-edit", from]);
+  } catch (error) {
+    failed = error;
+    await runGit(cwd, ["merge", "--abort"]).catch(() => undefined);
+  } finally {
+    if (current && current !== into) await runGit(cwd, ["switch", "--", current]);
+  }
+  if (failed) throw failed;
 }

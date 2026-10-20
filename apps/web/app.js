@@ -287,8 +287,19 @@ function renderSummary(gate) {
   const show = gate.state === "awaiting_release" || gate.state === "awaiting_review";
   wrap.hidden = !show;
   if (!show || !slice) return;
-  const primary = gate.state !== "awaiting_release" ? "核对通过" : gate.phase === "requirement" ? "需求准入" : "放行";
-  decisions.append(decision(primary, () => act(gate.state === "awaiting_release" ? "release" : "ack", slice.sliceId)));
+  if (gate.state === "awaiting_review") {
+    const select = document.createElement("select");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "选择分支";
+    select.append(placeholder);
+    decisions.append(select);
+    decisions.append(decision("核验通过", () => verify(slice.sliceId, select)));
+    void fillBranches(select).catch(showError);
+  } else {
+    const primary = gate.phase === "requirement" ? "需求准入" : "放行";
+    decisions.append(decision(primary, () => act("release", slice.sliceId)));
+  }
   decisions.append(decision("退回", () => act("reject", slice.sliceId)));
   const banner = $("banner");
   banner.hidden = !(slice.mismatch || gate.lease === "revert");
@@ -317,6 +328,44 @@ async function act(name, sliceId) {
   });
   state.sliceId = "";
   await refresh();
+}
+
+async function fillBranches(select) {
+  const { branches } = await api(`/repos/${state.repoId}/branches`);
+  if (!select.isConnected) return;
+  const chosen = select.value;
+  for (const name of branches) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.append(option);
+  }
+  if (branches.includes(chosen)) select.value = chosen;
+}
+
+let verifying = false;
+
+async function verify(sliceId, select) {
+  if (verifying) return;
+  const branch = select.value.trim();
+  if (!branch) {
+    showNotice("请选择要合并过去的分支。");
+    return;
+  }
+  verifying = true;
+  select.disabled = true;
+  for (const button of $("decisions").querySelectorAll("button")) button.disabled = true;
+  try {
+    await api(`/repos/${state.repoId}/gate/ack`, {
+      method: "POST",
+      body: JSON.stringify({ sliceId, branch }),
+    });
+    state.sliceId = "";
+    await refresh();
+  } finally {
+    verifying = false;
+    if (select.isConnected) select.disabled = false;
+  }
 }
 
 function showFileHead(pathText, summary) {
