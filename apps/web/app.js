@@ -14,7 +14,6 @@ const state = {
   source: "",
   signature: "",
   picked: [],
-  anchor: "",
   explainThreads: [],
   explainOpen: {},
   pendingExplain: {},
@@ -159,7 +158,6 @@ function resetView() {
   state.locations = [];
   state.source = "";
   state.picked = [];
-  state.anchor = "";
   state.explainThreads = [];
   state.explainOpen = {};
   state.pendingExplain = {};
@@ -348,7 +346,6 @@ function renderFiles(files) {
       state.fileId = file.fileId;
       state.source = "";
       state.picked = [];
-      state.anchor = "";
       $("source").hidden = true;
       void refresh().catch(showError);
     });
@@ -387,7 +384,7 @@ function renderViewbar() {
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "点行号多选，按住左键拖动或 Shift 连选同一侧的行。连续选区的正下方展开解释栏，一个文件里可以有多条。";
+  hint.textContent = "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
@@ -498,7 +495,7 @@ function lineRow(text, type, primary, secondary, side, path) {
     row.append(oldNum);
   }
   if (primary !== "") {
-    num.title = "点选、拖动或 Shift 连选";
+    num.title = "点选或拖动。滑过已选中的行会取消选中。";
     num.addEventListener("mousedown", (event) => startLineDrag(event, row));
     num.addEventListener("click", (event) => pickLine(event, row));
   }
@@ -526,8 +523,8 @@ function keysBetween(row, fromKey, toKey) {
 }
 
 function startLineDrag(event, row) {
-  if (event.button !== 0 || event.shiftKey) return;
-  lineDrag = { origin: row, moved: false };
+  if (event.button !== 0) return;
+  lineDrag = { origin: row, moved: false, base: [...state.picked] };
   document.body.classList.add("line-drag");
   event.preventDefault();
 }
@@ -539,13 +536,18 @@ function moveLineDrag(event) {
     return;
   }
   const current = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".line");
-  if (!current?.dataset.line || lineKey(current) === lineKey(lineDrag.origin)) return;
+  if (!current?.dataset.line) return;
   if (current.dataset.side !== lineDrag.origin.dataset.side || current.dataset.path !== lineDrag.origin.dataset.path) return;
+  if (lineKey(current) === lineKey(lineDrag.origin) && !lineDrag.moved) return;
   const keys = keysBetween(lineDrag.origin, lineKey(lineDrag.origin), lineKey(current));
   if (!keys) return;
   lineDrag.moved = true;
-  state.picked = keys;
-  state.anchor = lineKey(lineDrag.origin);
+  const range = new Set(keys);
+  const base = new Set(lineDrag.base);
+  state.picked = [
+    ...lineDrag.base.filter((key) => !range.has(key)),
+    ...keys.filter((key) => !base.has(key)),
+  ];
   paintPicked();
 }
 
@@ -570,15 +572,11 @@ function pickLine(event, row) {
   event.stopPropagation();
   if (!row.dataset.line) return;
   const key = lineKey(row);
-  if (event.shiftKey && state.anchor) {
-    const keys = keysBetween(row, state.anchor, key);
-    if (keys) state.picked = keys;
-  } else if (state.picked.includes(key)) {
+  if (state.picked.includes(key)) {
     state.picked = state.picked.filter((item) => item !== key);
   } else {
     state.picked = [...state.picked, key];
   }
-  state.anchor = key;
   paintPicked();
   placeExplainBars();
 }
@@ -942,7 +940,6 @@ function openSession(item) {
   state.sliceId = "";
   state.fileId = "";
   state.picked = [];
-  state.anchor = "";
   state.signature = "";
   renderSessions(item.sessionId);
   if (!item.current) renderWorkBranches(item);
@@ -1032,7 +1029,6 @@ document.addEventListener("click", (event) => {
     state.fileId = "";
     state.viewSession = "";
     state.picked = [];
-    state.anchor = "";
     state.signature = "";
     void refresh().catch(showError);
     return;
