@@ -1,0 +1,38 @@
+apps/daemon/src/server.ts
+  s_2664ea1b16ddeb::t_a68bcc9b2d0119 40
+  s_2664ea1b16ddeb::t_d854df5916f316 306-314
+apps/daemon/src/work-branch.ts
+  s_2664ea1b16ddeb::t_c2bdf17c9a7525 5
+  s_2664ea1b16ddeb::t_26b3ea5782374b 157-169
+apps/daemon/src/branches.ts
+  s_2664ea1b16ddeb::t_0edf68337095dc 19-20
+  s_2664ea1b16ddeb::t_90b11c35bfefdd 67-86
+test/work-branch.test.ts
+  s_2664ea1b16ddeb::t_c4b3b4978b1327 9
+  s_2664ea1b16ddeb::t_6c3118a63ded66 180-254
+apps/web/app.js
+  s_2664ea1b16ddeb::t_2f955f7b9bf74c 300
+  s_2664ea1b16ddeb::t_9b705e336fcc65 332-358
+  s_2664ea1b16ddeb::t_58f906bfbbba32 292-299,301
+apps/web/app.css
+  s_2664ea1b16ddeb::t_e1abf0c57acb7f 42-49
+apps/web/index.html
+  s_2664ea1b16ddeb::t_5b07473d386ef1 79
+  s_2664ea1b16ddeb::t_779d6708a05ec9 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c271a255a0edb30102ab483a6ea8f8f699ae6ac0",
+  "prompts": {},
+  "sessions": {
+    "s_2664ea1b16ddeb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d15644cb-47e7-4e44-a1e0-394c0e95a2b5",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
