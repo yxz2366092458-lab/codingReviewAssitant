@@ -1,0 +1,32 @@
+apps/daemon/src/work-branch.ts
+  s_da7f224c976a7c::t_5316d1e53ebf8c 118,131
+  s_da7f224c976a7c::t_9a20c0acd353be 215-225
+  s_da7f224c976a7c::t_d982cc28decee5 1-5
+  s_da7f224c976a7c::t_5131655b8bebdf 121-130,132
+  s_da7f224c976a7c::t_03949eb3ecdf74 13,16-90
+  s_da7f224c976a7c::t_3aa05682a80289 214
+test/work-branch.test.ts
+  s_da7f224c976a7c::t_9a0465c67f4db2 15-17,22-35
+  s_da7f224c976a7c::t_de55cf9bf3788d 36,38-53
+  s_da7f224c976a7c::t_ce5e2c568764e4 9
+  s_da7f224c976a7c::t_bc11d27b047643 37
+apps/daemon/src/server.ts
+  s_da7f224c976a7c::t_3adeb9d7f9cb77 40
+  s_da7f224c976a7c::t_d513ce1b53b333 274-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "060edd6e391a0f14c1facfa91fcecde5a4741fe9",
+  "prompts": {},
+  "sessions": {
+    "s_da7f224c976a7c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a4f32c3-eccc-4d0b-8836-92ef5818dc3b",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
