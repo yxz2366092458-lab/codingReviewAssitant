@@ -1,0 +1,29 @@
+apps/daemon/src/work-branch.ts
+  s_2664ea1b16ddeb::t_e2b912801e5a30 5
+  s_2664ea1b16ddeb::t_089e5afba69187 157-170
+apps/daemon/src/branches.ts
+  s_2664ea1b16ddeb::t_4862083a0b4d8c 19-20,29-34
+  s_2664ea1b16ddeb::t_a1fb05b519232f 35,75-94
+  s_2664ea1b16ddeb::t_2032e7af11ff17 36
+test/work-branch.test.ts
+  s_2664ea1b16ddeb::t_cbc7fad14b55d4 8-9
+  s_2664ea1b16ddeb::t_b9be9c2ae4594a 180-187,190,192-193,195-277
+  s_2664ea1b16ddeb::t_d14a8e4aee680b 188-189
+  s_2664ea1b16ddeb::t_0819e861a95843 191,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dc7e24f1912805640a4037b6f3510210bc402067",
+  "prompts": {},
+  "sessions": {
+    "s_2664ea1b16ddeb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d15644cb-47e7-4e44-a1e0-394c0e95a2b5",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
