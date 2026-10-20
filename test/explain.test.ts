@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, parseCommentAction, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
 import { currentSessionId, listWorkSessions, readSessionBranches } from "../apps/daemon/src/work-branch.ts";
 
 const lines = [{ path: "apps/web/app.js", side: "head" as const, line: 12, text: "return total;" }];
@@ -27,6 +27,18 @@ test("同一会话的下一次评论带上之前的解释", () => {
 test("评论留空时仍然要求解释作用", () => {
   const prompt = sessionPrompt([], lines, "  ");
   assert.match(prompt, /解释这些代码的作用/);
+  assert.match(prompt, /动作：答复/);
+  assert.match(prompt, /动作：修改/);
+});
+
+test("评论动作能解析成答复或修改，格式不对就当作答复", () => {
+  const reply = parseCommentAction("动作：答复\n说明：\n这行返回合计。");
+  assert.deepEqual(reply, { kind: "reply", text: "这行返回合计。" });
+  const edit = parseCommentAction("动作：修改\n说明：\n改成直接返回。\n代码：\nreturn total;");
+  assert.deepEqual(edit, { kind: "edit", text: "改成直接返回。", code: "return total;" });
+  const broken = "请把这行改成 return 0;";
+  assert.deepEqual(parseCommentAction(broken), { kind: "reply", text: broken });
+  assert.equal(parseCommentAction("动作：修改\n说明：\n还没给出代码。").kind, "reply");
 });
 
 test("非法行会被丢掉，同一会话累积评论", () => {

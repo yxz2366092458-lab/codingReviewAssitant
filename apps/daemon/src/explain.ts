@@ -126,12 +126,48 @@ export function explainPrompt(lines: CodeLine[], style: ExplainStyle): string {
   return `你是代码评审助手。只根据给出的代码行${task}不要评价好坏，不要编造没出现的行为。\n\n${body}`;
 }
 
+export type CommentAction =
+  | { kind: "reply"; text: string }
+  | { kind: "edit"; text: string; code: string };
+
 export function sessionPrompt(history: ExplainTurn[], lines: CodeLine[], comment: string): string {
   const prior = history.map((turn) => `${turn.role === "user" ? "人" : "AI"}：${turn.content}`).join("\n\n");
-  return `你是代码评审助手，正在同一会话里回答人的评论。只根据给出的代码行解释它们在做什么。用中文，先说这些行共同完成的事，再按行说明各自的作用。不要评价好坏，不要编造没出现的行为。
+  return `你是代码评审助手，正在同一会话里处理人的评论。只根据给出的代码行，在答复和修改之间二选一。不要评价好坏，不要编造没出现的行为。
+
+人如果是在问这些代码做什么，就答复。人如果是在要求改这些选中的代码，就修改。
+
+答复时只输出：
+动作：答复
+说明：
+用中文先说这些行共同完成的事，再按行说明各自的作用。
+
+修改时只输出：
+动作：修改
+说明：
+用中文写清选中代码要改成什么。
+代码：
+写出替换选中范围的完整代码，保留原有缩进。不要加围栏。
 
 ${prior ? `同一会话里已经说过：\n${prior}\n\n` : ""}这次评论和选中的代码：
 ${userTurn(lines, comment)}`;
+}
+
+export function parseCommentAction(raw: string): CommentAction {
+  const source = raw.trim();
+  const rows = source.split("\n");
+  const kind = rows[0] === "动作：答复" ? "reply" : rows[0] === "动作：修改" ? "edit" : "";
+  if (!kind || rows[1] !== "说明：") return { kind: "reply", text: source };
+  if (kind === "reply") {
+    const text = rows.slice(2).join("\n").trim();
+    if (!text || rows.includes("代码：")) return { kind: "reply", text: source };
+    return { kind: "reply", text };
+  }
+  const codeAt = rows.indexOf("代码：");
+  if (codeAt < 3) return { kind: "reply", text: source };
+  const text = rows.slice(2, codeAt).join("\n").trim();
+  const code = rows.slice(codeAt + 1).join("\n").replace(/\s+$/, "");
+  if (!text || !code.trim()) return { kind: "reply", text: source };
+  return { kind: "edit", text, code };
 }
 
 export function remember(key: string, history: ExplainTurn[], lines: CodeLine[], comment: string, reply: string): ExplainTurn[] {
@@ -332,9 +368,12 @@ export async function explainInSession(
     throw error;
   }
   if (!reply) throw new Error("解释失败");
-  const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: reply }].slice(-12);
+  const action = parseCommentAction(reply);
+  const shown = action.text.trim();
+  if (!shown) throw new Error("解释失败");
+  const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: shown }].slice(-12);
   saveThread(db, repoId, sessionId, target, turns);
-  return { reply, turns, anchor: target };
+  return { reply: shown, turns, anchor: target };
 }
 
 export async function explainSelection(
