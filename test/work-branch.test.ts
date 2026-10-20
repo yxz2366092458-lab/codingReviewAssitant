@@ -5,11 +5,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { mergeFastForward } from "../apps/daemon/src/branches.ts";
-import { workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { sessionBranchNames, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
 }
+
+test("会话编号分成需求分支和开发分支", () => {
+  assert.deepEqual(sessionBranchNames("c39dda95-5a27-42ce-9123-194b6979821f"), {
+    requirement: "req/c39dda955a2742ce",
+    development: "dev/c39dda955a2742ce",
+  });
+});
 
 test("需求名分成需求分支和开发分支", () => {
   assert.deepEqual(workBranchNames("登记多个工程"), {

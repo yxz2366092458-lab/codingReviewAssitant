@@ -210,7 +210,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
       const view = gateView(db, repo.id);
-      const pair = readWorkBranches(db, repo.id);
+      const pair = readWorkBranches(db, repo.id, status.branch);
       sendJson(res, 200, {
         ...status,
         baseRef: repo.base_ref,
@@ -258,6 +258,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "POST" && rest === "gate/intent") {
       const body = await readJson(req);
+      if (!gateView(db, repo.id).slice) {
+        const session = String(body.session ?? "").trim();
+        if (!session) throw new GateError(400, "没有会话，不能建立分支");
+        await openWorkBranches(db, repo.path, repo.id, "HEAD", session, true);
+      }
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
       if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
       publish(repo.id);
@@ -280,7 +285,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "POST" && rest === "gate/ack") {
       const body = await readJson(req);
-      await mergeWorkBranches(db, repo.path, repo.id);
+      const status = await repoStatus(repo.path, repo.base_ref);
+      await mergeWorkBranches(db, repo.path, repo.id, status.branch);
       acknowledge(db, String(body.sliceId ?? ""));
       publish(repo.id);
       sendJson(res, 200, gateView(db, repo.id));
@@ -364,10 +370,18 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     return { repoId: id, branch: status.branch, baseRef };
   }
 
+  async function headBranch(cwd: string): Promise<string> {
+    try {
+      return (await git(cwd, ["symbolic-ref", "--short", "HEAD"])).trim();
+    } catch {
+      return "";
+    }
+  }
+
   async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null) {
     try {
       if (scope === "branch") {
-        const pair = readWorkBranches(db, repoId);
+        const pair = readWorkBranches(db, repoId, await headBranch(cwd));
         if (pair) return await listRange(cwd, pair.requirement, pair.development);
         return await listRange(cwd, baseRef, (await git(cwd, ["rev-parse", "HEAD"])).trim());
       }
@@ -386,7 +400,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null): Promise<string[]> {
     if (scope === "branch") {
-      const pair = readWorkBranches(db, repoId);
+      const pair = readWorkBranches(db, repoId, await headBranch(cwd));
       if (pair) return [`${pair.requirement}...${pair.development}`];
       return [`${baseRef}...${(await git(cwd, ["rev-parse", "HEAD"])).trim()}`];
     }

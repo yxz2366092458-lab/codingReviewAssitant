@@ -42,6 +42,7 @@ if (command === "intend") {
     agent: process.env.REVIEW_AGENT ?? "agent",
     purpose,
     final,
+    session: process.env.CURSOR_CONVERSATION_ID || process.env.REVIEW_SESSION || "",
   });
   process.stdout.write(`${view.slice?.sliceId ?? ""}\n${view.state}\n`);
   process.exit(0);
