@@ -58,6 +58,17 @@ export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: s
   await mergeFastForward(cwd, pair.requirement, pair.development);
 }
 
+export function currentSessionId(db: DatabaseSync, repoId: string, headBranch: string): string {
+  ensureWorkBranches(db);
+  const rows = db.prepare("SELECT session_id, development FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{
+    session_id: string;
+    development: string;
+  }>;
+  if (!rows.length) return "";
+  const match = headBranch ? rows.find((row) => row.development === headBranch) : undefined;
+  return (match ?? rows[rows.length - 1])?.session_id.trim() ?? "";
+}
+
 export function sessionPhase(
   db: DatabaseSync,
   repoId: string,

@@ -106,7 +106,20 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .line { display: grid; grid-template-columns: 48px 48px 1fr; white-space: pre; }
 .line.add { background: var(--add); }
 .line.del { background: var(--del); }
-.num { color: var(--muted); text-align: right; padding-right: 8px; }
+.num { color: var(--muted); text-align: right; padding-right: 8px; cursor: pointer; }
+.line.picked { box-shadow: inset 3px 0 0 var(--accent); }
+.comment { padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.comment textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+.comment .ask, .comment .explain { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.6; }
+.comment .explain { background: var(--fill); padding: 8px 10px; }
 .split { display: grid; grid-template-columns: 1fr 1fr; }
 .split-col + .split-col { border-left: 1px solid var(--line); }
 .split .line { grid-template-columns: 48px 1fr; }

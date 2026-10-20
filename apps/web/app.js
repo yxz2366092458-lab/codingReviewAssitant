@@ -13,6 +13,9 @@ const state = {
   locations: [],
   source: "",
   signature: "",
+  picked: [],
+  anchor: "",
+  explainTurns: [],
 };
 
 let events = null;
@@ -65,6 +68,7 @@ async function bootRepo() {
     event.preventDefault();
     void registerRepo().catch(showError);
   });
+  $("comment-send").addEventListener("click", () => void sendComment().catch(showError));
   connect();
   await refresh();
   setInterval(() => void refresh().catch(showError), 1500);
@@ -141,7 +145,11 @@ function resetView() {
   state.signature = "";
   state.locations = [];
   state.source = "";
+  state.picked = [];
+  state.anchor = "";
+  state.explainTurns = [];
   $("source").hidden = true;
+  renderComment();
   $("diff").replaceChildren();
   connect();
 }
@@ -277,6 +285,8 @@ function renderFiles(files) {
     row.addEventListener("click", () => {
       state.fileId = file.fileId;
       state.source = "";
+      state.picked = [];
+      state.anchor = "";
       $("source").hidden = true;
       void refresh().catch(showError);
     });
@@ -293,6 +303,8 @@ async function renderPatch() {
   diff.replaceChildren();
   if (state.mode === "unified") diff.append(unified(patch));
   else diff.append(split(patch));
+  paintPicked();
+  renderComment();
 }
 
 function renderViewbar() {
@@ -313,7 +325,7 @@ function renderViewbar() {
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "按住 Command 再点左键，跳到实现。普通左键只选中。";
+  hint.textContent = "按住 Command 再点左键，跳到实现。点行号多选代码，Shift 连选，再写评论让当前会话解释作用。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
@@ -423,8 +435,94 @@ function lineRow(text, type, primary, secondary, side, path) {
     oldNum.textContent = "";
     row.append(oldNum);
   }
+  if (primary !== "") {
+    num.title = "点选，Shift 连选";
+    num.addEventListener("click", (event) => pickLine(event, row));
+  }
   row.append(num, code);
   return row;
+}
+
+function lineKey(row) {
+  return `${row.dataset.path}\0${row.dataset.side}\0${row.dataset.line}`;
+}
+
+function pickLine(event, row) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!row.dataset.line) return;
+  const key = lineKey(row);
+  if (event.shiftKey && state.anchor) {
+    const rows = [...document.querySelectorAll(`#diff .line[data-side="${row.dataset.side}"]`)].filter((item) => item.dataset.line);
+    const start = rows.findIndex((item) => lineKey(item) === state.anchor);
+    const end = rows.findIndex((item) => lineKey(item) === key);
+    if (start >= 0 && end >= 0) {
+      const [from, to] = start < end ? [start, end] : [end, start];
+      state.picked = rows.slice(from, to + 1).map(lineKey);
+    }
+  } else if (state.picked.includes(key)) {
+    state.picked = state.picked.filter((item) => item !== key);
+  } else {
+    state.picked = [...state.picked, key];
+  }
+  state.anchor = key;
+  paintPicked();
+  renderComment();
+}
+
+function paintPicked() {
+  for (const row of document.querySelectorAll("#diff .line")) {
+    row.classList.toggle("picked", state.picked.includes(lineKey(row)));
+  }
+}
+
+function selectedLines() {
+  return [...document.querySelectorAll("#diff .line")]
+    .filter((row) => state.picked.includes(lineKey(row)))
+    .map((row) => ({
+      path: row.dataset.path,
+      side: row.dataset.side,
+      line: Number(row.dataset.line),
+      text: row.querySelector("span:last-child")?.textContent ?? "",
+    }));
+}
+
+function renderComment() {
+  const count = selectedLines().length;
+  const dock = $("comment");
+  dock.hidden = count === 0 && state.explainTurns.length === 0;
+  $("comment-selection").textContent = count ? `已选 ${count} 行。评论后由当前会话解释作用。` : "当前会话里的解释";
+  const thread = $("comment-thread");
+  thread.replaceChildren();
+  for (const turn of state.explainTurns) {
+    const item = document.createElement("p");
+    item.className = turn.role === "assistant" ? "explain" : "ask";
+    item.textContent = turn.content;
+    thread.append(item);
+  }
+}
+
+async function sendComment() {
+  const lines = selectedLines();
+  if (!lines.length) {
+    showNotice("先点行号选中要评论的代码。");
+    return;
+  }
+  const button = $("comment-send");
+  button.disabled = true;
+  showNotice("正在让当前会话解释选中的代码。");
+  try {
+    const result = await api(`/repos/${state.repoId}/explain`, {
+      method: "POST",
+      body: JSON.stringify({ lines, comment: $("comment-text").value }),
+    });
+    state.explainTurns = result.turns ?? [];
+    $("comment-text").value = "";
+    showNotice("");
+    renderComment();
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function symbols(kind) {

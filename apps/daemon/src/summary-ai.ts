@@ -92,6 +92,10 @@ function readProvider(): { model: string; url: string; token: string; wire: stri
   return { model, url: base.replace(/\/$/, ""), token, wire };
 }
 
+export async function completePrompt(prompt: string): Promise<string> {
+  return ask(prompt);
+}
+
 async function ask(prompt: string): Promise<string> {
   const config = readProvider();
   const responses = config.wire === "responses";

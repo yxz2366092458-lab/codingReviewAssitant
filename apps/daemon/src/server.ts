@@ -35,7 +35,8 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
-import { admitSession, mergeWorkBranches, openWorkBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
+import { explainInSession, normalizeLines } from "./explain.ts";
+import { admitSession, currentSessionId, mergeWorkBranches, openWorkBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { summarizeDiff } from "./summary-ai.ts";
@@ -357,6 +358,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "GET" && rest === "source") {
       sendJson(res, 200, readSource(repo.path, url.searchParams.get("path") ?? "", Number(url.searchParams.get("line") ?? "1")));
+      return;
+    }
+    if (req.method === "POST" && rest === "explain") {
+      const body = await readJson(req);
+      const lines = normalizeLines(body.lines);
+      if (!lines.length) throw new GateError(400, "先选中代码行");
+      const session = currentSessionId(db, repo.id, await headBranch(repo.path));
+      const result = await explainInSession(`${repo.id}:${session || "panel"}`, lines, String(body.comment ?? ""));
+      sendJson(res, 200, result);
       return;
     }
     sendJson(res, 404, { error: "没有这个地址" });

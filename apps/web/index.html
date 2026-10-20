@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>代码评审</title>
-    <link rel="stylesheet" href="/app.css?panel=2" />
+    <link rel="stylesheet" href="/app.css?panel=3" />
   </head>
   <body>
     <header class="top">
@@ -53,6 +53,12 @@
         <div id="viewbar"></div>
         <div id="locations"></div>
         <div id="diff"></div>
+        <div id="comment" class="comment" hidden>
+          <p id="comment-selection" class="kicker"></p>
+          <div id="comment-thread"></div>
+          <textarea id="comment-text" rows="3" placeholder="评论选中的代码。留空则直接解释这些行的作用。"></textarea>
+          <button type="button" id="comment-send">解释</button>
+        </div>
         <pre id="source" class="source" hidden></pre>
       </section>
     </div>
@@ -68,6 +74,6 @@
     </section>
     <p id="error" class="error" hidden></p>
     <script>/*__BOOT__*/</script>
-    <script src="/app.js?panel=2"></script>
+    <script src="/app.js?panel=3"></script>
   </body>
 </html>
