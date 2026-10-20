@@ -1,0 +1,39 @@
+apps/web/index.html
+  s_5f3d8f56fde9b6::t_0130d602dd096e 38
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_ab88be362069b1 38
+  s_5f3d8f56fde9b6::t_d6a64971924467 256-261
+  s_5f3d8f56fde9b6::t_add5d2f4742b7e 287-289
+apps/web/app.css
+  s_5f3d8f56fde9b6::t_b026e6acdf19f2 68-76
+apps/web/app.js
+  s_5f3d8f56fde9b6::t_341a72b1d370ff 210-213
+  s_5f3d8f56fde9b6::t_95169e22046875 198
+  s_5f3d8f56fde9b6::t_8789130d87722b 220
+  s_5f3d8f56fde9b6::t_65ecd6b09400af 29-36
+  s_5f3d8f56fde9b6::t_068a72796dd442 185
+  s_5f3d8f56fde9b6::t_54a299e6c5c2e8 170
+test/work-branch.test.ts
+  s_5f3d8f56fde9b6::t_4fef0a5b361dda 9
+  s_5f3d8f56fde9b6::t_e4da9b0da6ef99 91-114
+apps/daemon/src/work-branch.ts
+  s_5f3d8f56fde9b6::t_405ec29718c518 61-100
+  s_5f3d8f56fde9b6::t_de9ab1d96d4744 121-135
+  s_5f3d8f56fde9b6::t_dad135af633cf5 108-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f64d0976ca6ef913e6e847f768575403701a6857",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
