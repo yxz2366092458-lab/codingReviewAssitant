@@ -40,6 +40,8 @@ button {
 button.active { background: var(--ink); color: var(--bg); }
 button.decision { min-width: 96px; }
 .top, .summary, .history { padding: 12px 16px; }
+.history .row { margin-top: 12px; }
+.history .row { margin-top: 12px; }
 .top, .file-head, .viewbar, .workspace { border-bottom: 1px solid var(--line); }
 .top { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: var(--panel); }
 .project-switch { display: flex; gap: 8px; align-items: center; }

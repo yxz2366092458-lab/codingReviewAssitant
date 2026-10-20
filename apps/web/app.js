@@ -9,6 +9,7 @@ const state = {
   fileId: "",
   files: [],
   sliceId: "",
+  historyPage: 1,
   locations: [],
   source: "",
   signature: "",
@@ -128,6 +129,7 @@ async function switchRepo(repoId) {
 function resetView() {
   state.fileId = "";
   state.sliceId = "";
+  state.historyPage = 1;
   state.signature = "";
   state.locations = [];
   state.source = "";
@@ -150,7 +152,7 @@ async function refresh() {
     api(`/repos/${state.repoId}/status`),
     api(`/repos/${state.repoId}/gate`),
     api(`/repos/${state.repoId}/diff?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`),
-    api(`/repos/${state.repoId}/slices`),
+    api(`/repos/${state.repoId}/slices?page=${state.historyPage}`),
   ]);
   const signature = JSON.stringify({
     gate: gate.state,
@@ -162,6 +164,8 @@ async function refresh() {
     mode: state.mode,
     requirement: status.requirement,
     development: status.development,
+    historyPage: slices.page,
+    history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
     fileId: state.fileId,
     symbol: state.symbol,
     locations: state.locations.map((item) => `${item.path}:${item.line}`),
@@ -446,7 +450,12 @@ function identifierFrom(event) {
   return match?.[0] ?? [...text.matchAll(/[A-Za-z_$][\w$]*/g)].at(-1)?.[0] ?? "";
 }
 
-function renderHistory(slices) {
+function renderHistory(page) {
+  const slices = page.items ?? [];
+  const pageSize = page.pageSize || 10;
+  const total = page.total ?? slices.length;
+  const current = page.page || 1;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   const body = $("history");
   body.replaceChildren();
   for (const slice of slices) {
@@ -465,6 +474,37 @@ function renderHistory(slices) {
     });
     body.append(row);
   }
+  const pager = $("history-pager");
+  pager.replaceChildren();
+  pager.append(
+    pageButton("上一页", current <= 1, () => {
+      state.historyPage = current - 1;
+      state.signature = "";
+      void refresh().catch(showError);
+    }),
+    pageLabel(`${current} / ${pages}，共 ${total} 条`),
+    pageButton("下一页", current >= pages, () => {
+      state.historyPage = current + 1;
+      state.signature = "";
+      void refresh().catch(showError);
+    }),
+  );
+}
+
+function pageButton(text, disabled, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = text;
+  button.disabled = disabled;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function pageLabel(text) {
+  const label = document.createElement("span");
+  label.className = "muted";
+  label.textContent = text;
+  return label;
 }
 
 function showNotice(text) {

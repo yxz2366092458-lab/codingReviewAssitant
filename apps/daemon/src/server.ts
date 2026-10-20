@@ -24,9 +24,11 @@ import {
   findRepoByPath,
   findSlice,
   insertRepo,
+  countSlices,
   listRepos,
   listSlices,
   openStore,
+  SLICE_PAGE_SIZE,
   setBaseRef,
   toSlice,
   writeDaemonInfo,
@@ -307,7 +309,13 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "slices") {
-      sendJson(res, 200, listSlices(db, repo.id).map(toSlice));
+      const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+      sendJson(res, 200, {
+        items: listSlices(db, repo.id, page).map(toSlice),
+        total: countSlices(db, repo.id),
+        page,
+        pageSize: SLICE_PAGE_SIZE,
+      });
       return;
     }
     if (req.method === "GET" && rest === "diff") {
