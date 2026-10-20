@@ -45,6 +45,13 @@ export async function createBranch(cwd: string, name: string, start: string): Pr
   await runGit(cwd, ["branch", branch, point]);
 }
 
+export async function renameBranch(cwd: string, from: string, to: string): Promise<void> {
+  const source = assertBranchName(from);
+  const target = assertBranchName(to);
+  if (source === target) return;
+  await runGit(cwd, ["branch", "-m", source, target]);
+}
+
 export async function mergeFastForward(cwd: string, target: string, source: string): Promise<void> {
   const into = assertBranchName(target);
   const from = assertBranchName(source);

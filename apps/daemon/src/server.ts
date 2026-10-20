@@ -37,7 +37,7 @@ import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
-import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, sessionPhase } from "./work-branch.ts";
+import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -215,6 +215,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
       const view = gateView(db, repo.id);
+      await repairSessionRequirements(db, repo.path, repo.id);
       const pair = readWorkBranches(db, repo.id, status.branch);
       sendJson(res, 200, {
         ...status,

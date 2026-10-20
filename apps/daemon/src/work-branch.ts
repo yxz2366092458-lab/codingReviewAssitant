@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { checkoutBranch, createBranch, listLocalBranches, mergeFastForward } from "./branches.ts";
+import { checkoutBranch, createBranch, listLocalBranches, mergeFastForward, renameBranch } from "./branches.ts";
 
 export function workBranchNames(title: string): { requirement: string; development: string } {
   const slug = title.trim().replace(/\s+/g, "-").replace(/\./g, "").slice(0, 48);
@@ -10,8 +10,12 @@ export function workBranchNames(title: string): { requirement: string; developme
   return { requirement: `req/${slug}`, development: `dev/${slug}` };
 }
 
+export function sessionSlug(sessionId: string): string {
+  return sessionId.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
+}
+
 export function sessionBranchNames(sessionId: string, summary: string): { requirement: string; development: string } {
-  const slug = sessionId.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
+  const slug = sessionSlug(sessionId);
   if (slug.length < 8) throw new Error("会话无效");
   return { requirement: requirementBranchName(summary), development: `dev/${slug}` };
 }
@@ -121,8 +125,11 @@ export async function openWorkBranches(
   if (fromSession) {
     const existing = readSessionBranches(db, repoId, sessionId);
     if (existing) {
-      await checkoutBranch(cwd, existing.development);
-      return existing;
+      const provided = summaryText.trim();
+      await repairSessionRequirements(db, cwd, repoId, provided ? { [sessionId]: provided } : {});
+      const current = readSessionBranches(db, repoId, sessionId) ?? existing;
+      await checkoutBranch(cwd, current.development);
+      return current;
     }
   }
   const summary = fromSession ? summaryText.trim() || readSessionSummary(sessionId) : "";
@@ -210,6 +217,45 @@ export function admitSession(db: DatabaseSync, repoId: string, headBranch: strin
     repoId,
     row.development,
   );
+}
+
+export async function repairSessionRequirements(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  summaries: Record<string, string> = {},
+): Promise<void> {
+  ensureWorkBranches(db);
+  const rows = db.prepare("SELECT session_id, requirement FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{
+    session_id: string;
+    requirement: string;
+  }>;
+  const branches = new Set(await listLocalBranches(cwd));
+  for (const row of rows) {
+    const sessionId = row.session_id.trim();
+    const slug = sessionSlug(sessionId);
+    if (slug.length < 8 || row.requirement !== `req/${slug}` || !branches.has(row.requirement)) continue;
+    const summary = summaries[sessionId]?.trim() || readSessionSummary(sessionId);
+    if (!summary) continue;
+    let desired = "";
+    try {
+      desired = requirementBranchName(summary);
+    } catch {
+      continue;
+    }
+    if (desired === row.requirement) continue;
+    let next = desired;
+    try {
+      next = await availableRequirement(db, cwd, repoId, desired);
+      if (next === row.requirement || branches.has(next)) continue;
+      await renameBranch(cwd, row.requirement, next);
+    } catch {
+      continue;
+    }
+    branches.delete(row.requirement);
+    branches.add(next);
+    db.prepare("UPDATE work_branches SET requirement = ? WHERE repo_id = ? AND session_id = ?").run(next, repoId, row.session_id);
+  }
 }
 
 async function availableRequirement(db: DatabaseSync, cwd: string, repoId: string, name: string): Promise<string> {

@@ -51,6 +51,39 @@ test("新建会话分支时需求分支取会话总结", async () => {
   assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), pair.development);
 });
 
+test("已有会话编号的需求分支改成会话总结", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-rename-req-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  const session = "fdea6284-fcb1-49cb-81a6-403628394b65";
+  git(cwd, ["branch", "req/fdea6284fcb149cb"]);
+  git(cwd, ["branch", "dev/fdea6284fcb149cb"]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    session,
+    "req/fdea6284fcb149cb",
+    "dev/fdea6284fcb149cb",
+  );
+  const pair = await openWorkBranches(db, cwd, "repo", "HEAD", session, true, "Session naming issue");
+  assert.equal(pair.requirement, "req/Session-naming-issue");
+  assert.equal(pair.development, "dev/fdea6284fcb149cb");
+  const branches = execFileSync("git", ["branch", "--format=%(refname:short)"], { cwd }).toString();
+  assert.match(branches, /req\/Session-naming-issue/);
+  assert.doesNotMatch(branches, /req\/fdea6284fcb149cb/);
+});
+
 test("需求名分成需求分支和开发分支", () => {
   assert.deepEqual(workBranchNames("登记多个工程"), {
     requirement: "req/登记多个工程",
