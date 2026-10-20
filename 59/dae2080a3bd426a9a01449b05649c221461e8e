@@ -1,0 +1,31 @@
+apps/cli/review-gate.ts
+  s_5f3d8f56fde9b6::t_7128a159702403 45
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_43e091c26ac0ae 261-265
+  s_5f3d8f56fde9b6::t_6b301462bac633 403
+  s_5f3d8f56fde9b6::t_4151551c8d52f9 288-289
+  s_5f3d8f56fde9b6::t_25286ac929284f 213
+  s_5f3d8f56fde9b6::t_44fc3e007594c1 373-380
+  s_5f3d8f56fde9b6::t_af6f0d18362a9d 384
+test/work-branch.test.ts
+  s_5f3d8f56fde9b6::t_1f244867de0fcc 14-20
+  s_5f3d8f56fde9b6::t_98dcd07e9931c2 8
+apps/daemon/src/work-branch.ts
+  s_5f3d8f56fde9b6::t_102e1588144ca6 10-20,22-31,40,42-43,49-51,55-57,62-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "59dae2080a3bd426a9a01449b05649c221461e8e",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
