@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>代码评审</title>
-    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/app.css?panel=2" />
   </head>
   <body>
     <header class="top">
@@ -17,10 +17,12 @@
       </div>
       <div>
         <strong id="repo-name">代码评审</strong>
-        <span class="muted">需求分支</span>
-        <span id="requirement-branch"></span>
-        <span class="muted">开发分支</span>
-        <span id="development-branch"></span>
+        <div class="work-branches">
+          <span class="muted">需求分支</span>
+          <strong id="requirement-branch">未建立</strong>
+          <span class="muted">开发分支</span>
+          <strong id="development-branch">未建立</strong>
+        </div>
       </div>
       <span id="gate-label" class="state"></span>
       <div class="top-actions">
@@ -65,6 +67,6 @@
     </section>
     <p id="error" class="error" hidden></p>
     <script>/*__BOOT__*/</script>
-    <script src="/app.js"></script>
+    <script src="/app.js?panel=2"></script>
   </body>
 </html>

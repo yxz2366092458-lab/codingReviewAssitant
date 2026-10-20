@@ -54,7 +54,13 @@ button.decision { min-width: 96px; }
   padding: 4px 12px;
   max-width: 240px;
 }
-.top-actions, .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.work-branches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.work-branches strong {
+  font-weight: 650;
+  background: var(--fill);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
 .muted, .kicker { color: var(--muted); }
 .kicker { font-size: 12px; margin: 12px 0 6px; }
 h1 { font-size: 22px; line-height: 1.4; margin: 0; font-weight: 600; }

@@ -160,13 +160,13 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         "/*__BOOT__*/",
         `window.__REVIEW__=${JSON.stringify({ token, repoPath })};`,
       );
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(html);
       return;
     }
     if (req.method === "GET" && (path === "/app.js" || path === "/app.css")) {
       const type = path.endsWith(".js") ? "text/javascript" : "text/css";
-      res.writeHead(200, { "content-type": `${type}; charset=utf-8` });
+      res.writeHead(200, { "content-type": `${type}; charset=utf-8`, "cache-control": "no-store" });
       res.end(readFileSync(join(webRoot, path.slice(1))));
       return;
     }
