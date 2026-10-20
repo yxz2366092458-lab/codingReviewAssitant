@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { loadTurns, normalizeLines, remember, resolveExplainSession, saveTurns, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { loadThreads, loadTurns, normalizeLines, readAnchor, remember, resolveExplainSession, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
 import { currentSessionId, listWorkSessions, readSessionBranches } from "../apps/daemon/src/work-branch.ts";
 
 const lines = [{ path: "apps/web/app.js", side: "head" as const, line: 12, text: "return total;" }];
@@ -90,4 +90,15 @@ test("历史会话单独保留解释，不会串到当前会话", () => {
   saveTurns(db, "repo", "new-session", [{ role: "assistant", content: "当前会话里的解释" }]);
   assert.equal(loadTurns(db, "repo", "old-session")[0]?.content, "历史会话里的解释");
   assert.equal(loadTurns(db, "repo", "new-session")[0]?.content, "当前会话里的解释");
+  const top = [{ path: "a.ts", side: "head" as const, line: 10, text: "a" }, { path: "a.ts", side: "head" as const, line: 11, text: "b" }];
+  const bottom = [{ path: "a.ts", side: "head" as const, line: 40, text: "c" }];
+  const anchors = selectionAnchors([...top, ...bottom, { path: "a.ts", side: "head", line: 4, text: "d" }]);
+  assert.deepEqual(anchors.map((item) => [item.start, item.end]), [[4, 4], [10, 11], [40, 40]]);
+  const upper = readAnchor({ path: "a.ts", side: "head", start: 10, end: 11 });
+  const lower = readAnchor({ path: "a.ts", side: "head", start: 40, end: 40 });
+  if (!upper || !lower) throw new Error("锚点无效");
+  saveThread(db, "repo", "old-session", upper, [{ role: "assistant", content: "上面的解释" }]);
+  saveThread(db, "repo", "old-session", lower, [{ role: "assistant", content: "下面的解释" }]);
+  const threads = loadThreads(db, "repo", "old-session");
+  assert.deepEqual(threads.map((item) => item.turns[0]?.content), ["上面的解释", "下面的解释"]);
 });

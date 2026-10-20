@@ -108,7 +108,26 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .line.del { background: var(--del); }
 .num { color: var(--muted); text-align: right; padding-right: 8px; cursor: pointer; }
 .line.picked { box-shadow: inset 3px 0 0 var(--accent); }
-.comment { padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.inline-comment {
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+}
+.inline-comment textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+  font: inherit;
+}
+.inline-comment .ask, .inline-comment .explain { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.6; }
+.inline-comment .explain { background: var(--fill); padding: 8px 10px; }
+.comment { display: none; }
 .comment textarea {
   width: 100%;
   border: 1px solid var(--line);

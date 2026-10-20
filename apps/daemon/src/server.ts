@@ -36,7 +36,7 @@ import {
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
-import { explainInSession, loadTurns, normalizeLines, resolveExplainSession } from "./explain.ts";
+import { explainInSession, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
 import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
@@ -372,7 +372,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "GET" && rest === "explain") {
       const session = explainSession(repo.id, await headBranch(repo.path), sessionQuery ?? "");
-      sendJson(res, 200, { sessionId: session, turns: loadTurns(db, repo.id, session) });
+      sendJson(res, 200, { sessionId: session, threads: loadThreads(db, repo.id, session) });
       return;
     }
     if (req.method === "POST" && rest === "explain") {
@@ -380,7 +380,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const lines = normalizeLines(body.lines);
       if (!lines.length) throw new GateError(400, "先选中代码行");
       const session = explainSession(repo.id, await headBranch(repo.path), String(body.sessionId ?? ""));
-      const result = await explainInSession(db, repo.id, session, lines, String(body.comment ?? ""));
+      const result = await explainInSession(db, repo.id, session, lines, String(body.comment ?? ""), readAnchor(body.anchor) ?? undefined);
       sendJson(res, 200, { sessionId: session, ...result });
       return;
     }

@@ -15,7 +15,8 @@ const state = {
   signature: "",
   picked: [],
   anchor: "",
-  explainTurns: [],
+  explainThreads: [],
+  drafts: {},
   viewSession: "",
   loadedExplainSession: "",
   sessions: [],
@@ -71,7 +72,6 @@ async function bootRepo() {
     event.preventDefault();
     void registerRepo().catch(showError);
   });
-  $("comment-send").addEventListener("click", () => void sendComment().catch(showError));
   connect();
   await refresh();
   setInterval(() => void refresh().catch(showError), 1500);
@@ -158,12 +158,12 @@ function resetView() {
   state.source = "";
   state.picked = [];
   state.anchor = "";
-  state.explainTurns = [];
+  state.explainThreads = [];
+  state.drafts = {};
   state.viewSession = "";
   state.loadedExplainSession = "";
   state.sessions = [];
   $("source").hidden = true;
-  renderComment();
   $("diff").replaceChildren();
   connect();
 }
@@ -241,7 +241,7 @@ async function loadPanel() {
   if (signature === state.signature) return;
   if (active !== state.loadedExplainSession) {
     const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
-    state.explainTurns = thread.turns ?? [];
+    state.explainThreads = thread.threads ?? [];
     state.loadedExplainSession = active;
   }
   state.signature = signature;
@@ -261,7 +261,6 @@ async function loadPanel() {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
     showFileHead(emptyDiffText(gate), "");
-    renderComment();
   }
 }
 
@@ -362,7 +361,7 @@ async function renderPatch() {
   if (state.mode === "unified") diff.append(unified(patch));
   else diff.append(split(patch));
   paintPicked();
-  renderComment();
+  placeExplainBars();
 }
 
 function renderViewbar() {
@@ -383,7 +382,7 @@ function renderViewbar() {
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "按住 Command 再点左键，跳到实现。点行号多选代码，Shift 连选，再写评论让当前会话解释作用。";
+  hint.textContent = "点行号多选，Shift 连选。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
@@ -525,7 +524,7 @@ function pickLine(event, row) {
   }
   state.anchor = key;
   paintPicked();
-  renderComment();
+  placeExplainBars();
 }
 
 function paintPicked() {
@@ -545,42 +544,133 @@ function selectedLines() {
     }));
 }
 
-function renderComment() {
-  const count = selectedLines().length;
-  const dock = $("comment");
-  dock.hidden = count === 0 && state.explainTurns.length === 0;
-  const viewing = state.sessions.find((item) => item.sessionId === state.loadedExplainSession);
-  const sessionName = state.scope === "session" && viewing ? viewing.development : "当前会话";
-  $("comment-selection").textContent = count ? `已选 ${count} 行。评论后由${sessionName}解释作用。` : `${sessionName}里的解释`;
-  const thread = $("comment-thread");
-  thread.replaceChildren();
-  for (const turn of state.explainTurns) {
-    const item = document.createElement("p");
-    item.className = turn.role === "assistant" ? "explain" : "ask";
-    item.textContent = turn.content;
-    thread.append(item);
+function anchorKey(anchor) {
+  return `${anchor.path}\0${anchor.side}\0${anchor.start}\0${anchor.end}`;
+}
+
+function contiguousGroups(lines) {
+  const buckets = new Map();
+  for (const line of lines) {
+    const key = `${line.path}\0${line.side}`;
+    const list = buckets.get(key) ?? [];
+    list.push(line);
+    buckets.set(key, list);
+  }
+  const groups = [];
+  for (const list of buckets.values()) {
+    list.sort((left, right) => left.line - right.line);
+    let current = [];
+    const push = () => {
+      if (!current.length) return;
+      groups.push({
+        path: current[0].path,
+        side: current[0].side,
+        start: current[0].line,
+        end: current[current.length - 1].line,
+        lines: current,
+      });
+    };
+    for (const line of list) {
+      const previous = current[current.length - 1];
+      if (previous && line.line > previous.line + 1) {
+        push();
+        current = [];
+      }
+      if (!previous || line.line !== previous.line) current.push(line);
+    }
+    push();
+  }
+  return groups;
+}
+
+function linesBetween(anchor) {
+  return [...document.querySelectorAll("#diff .line")]
+    .filter((row) => row.dataset.path === anchor.path && row.dataset.side === anchor.side)
+    .map((row) => ({
+      path: row.dataset.path,
+      side: row.dataset.side,
+      line: Number(row.dataset.line),
+      text: row.querySelector("span:last-child")?.textContent ?? "",
+    }))
+    .filter((line) => line.line >= anchor.start && line.line <= anchor.end);
+}
+
+function placeExplainBars() {
+  for (const dock of document.querySelectorAll("#diff .inline-comment")) {
+    const box = dock.querySelector("textarea");
+    if (box) state.drafts[dock.dataset.anchor] = box.value;
+    dock.remove();
+  }
+  const bars = new Map();
+  for (const thread of state.explainThreads) {
+    if (!thread.path) continue;
+    bars.set(anchorKey(thread), { ...thread, lines: thread.lines ?? [] });
+  }
+  for (const group of contiguousGroups(selectedLines())) {
+    const key = anchorKey(group);
+    const existing = bars.get(key) ?? { ...group, turns: [] };
+    existing.lines = group.lines;
+    bars.set(key, existing);
+  }
+  for (const group of bars.values()) {
+    const row = [...document.querySelectorAll("#diff .line")].find((item) => item.dataset.path === group.path && item.dataset.side === group.side && Number(item.dataset.line) === group.end);
+    if (row) row.after(explainDock(group));
   }
 }
 
-async function sendComment() {
-  const lines = selectedLines();
+function explainDock(group) {
+  const key = anchorKey(group);
+  const dock = document.createElement("div");
+  dock.className = "inline-comment";
+  dock.dataset.anchor = key;
+  const kicker = document.createElement("p");
+  kicker.className = "kicker";
+  kicker.textContent = group.start === group.end ? `第 ${group.start} 行` : `第 ${group.start}–${group.end} 行`;
+  dock.append(kicker);
+  for (const turn of group.turns ?? []) {
+    const item = document.createElement("p");
+    item.className = turn.role === "assistant" ? "explain" : "ask";
+    item.textContent = turn.content;
+    dock.append(item);
+  }
+  const text = document.createElement("textarea");
+  text.rows = 2;
+  text.placeholder = "评论这些代码。留空则直接解释作用。";
+  text.value = state.drafts[key] ?? "";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "解释";
+  button.addEventListener("click", () => void sendComment(group, text, button).catch(showError));
+  dock.append(text, button);
+  return dock;
+}
+
+async function sendComment(group, text, button) {
+  const lines = group.lines?.length ? group.lines : linesBetween(group);
   if (!lines.length) {
     showNotice("先点行号选中要评论的代码。");
     return;
   }
-  const button = $("comment-send");
   button.disabled = true;
   showNotice("正在让这个会话解释选中的代码。");
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
       method: "POST",
-      body: JSON.stringify({ lines, comment: $("comment-text").value, sessionId: state.loadedExplainSession }),
+      body: JSON.stringify({
+        lines,
+        comment: text.value,
+        sessionId: state.loadedExplainSession,
+        anchor: { path: group.path, side: group.side, start: group.start, end: group.end },
+      }),
     });
-    state.explainTurns = result.turns ?? [];
+    const anchor = result.anchor ?? group;
+    const key = anchorKey(anchor);
+    state.explainThreads = state.explainThreads.filter((item) => anchorKey(item) !== key);
+    state.explainThreads.push({ path: anchor.path, side: anchor.side, start: anchor.start, end: anchor.end, turns: result.turns ?? [] });
     if (result.sessionId) state.loadedExplainSession = result.sessionId;
-    $("comment-text").value = "";
+    delete state.drafts[key];
     showNotice("");
-    renderComment();
+    placeExplainBars();
   } finally {
     button.disabled = false;
   }

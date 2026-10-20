@@ -13,6 +13,19 @@ export type ExplainTurn = {
   content: string;
 };
 
+export type ExplainAnchor = {
+  path: string;
+  side: "base" | "head";
+  start: number;
+  end: number;
+};
+
+export type ExplainThread = ExplainAnchor & {
+  turns: ExplainTurn[];
+};
+
+const blankAnchor: ExplainAnchor = { path: "", side: "head", start: 0, end: 0 };
+
 const threads = new Map<string, ExplainTurn[]>();
 
 export function normalizeLines(value: unknown): CodeLine[] {
@@ -33,6 +46,58 @@ export function normalizeLines(value: unknown): CodeLine[] {
     if (lines.length >= 80) break;
   }
   return lines;
+}
+
+export function selectionAnchors(lines: CodeLine[]): Array<ExplainAnchor & { lines: CodeLine[] }> {
+  const buckets = new Map<string, CodeLine[]>();
+  for (const line of lines) {
+    const key = `${line.path}\0${line.side}`;
+    const list = buckets.get(key) ?? [];
+    list.push(line);
+    buckets.set(key, list);
+  }
+  const groups: Array<ExplainAnchor & { lines: CodeLine[] }> = [];
+  for (const list of buckets.values()) {
+    const sorted = [...list].sort((left, right) => left.line - right.line);
+    let current: CodeLine[] = [];
+    const push = () => {
+      if (!current.length) return;
+      groups.push({
+        path: current[0].path,
+        side: current[0].side,
+        start: current[0].line,
+        end: current[current.length - 1].line,
+        lines: current,
+      });
+    };
+    for (const line of sorted) {
+      const previous = current[current.length - 1];
+      if (previous && line.line > previous.line + 1) {
+        push();
+        current = [];
+      }
+      if (!previous || line.line !== previous.line) current.push(line);
+    }
+    push();
+  }
+  return groups;
+}
+
+export function anchorFor(lines: CodeLine[]): ExplainAnchor | null {
+  const groups = selectionAnchors(lines);
+  if (groups.length !== 1) return null;
+  return { path: groups[0].path, side: groups[0].side, start: groups[0].start, end: groups[0].end };
+}
+
+export function readAnchor(value: unknown): ExplainAnchor | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const path = String(record.path ?? "").trim();
+  const start = Number(record.start);
+  const end = Number(record.end);
+  if (!path || (record.side !== "base" && record.side !== "head")) return null;
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) return null;
+  return { path, side: record.side, start, end };
 }
 
 export function userTurn(lines: CodeLine[], comment: string): string {
@@ -71,41 +136,89 @@ export function resolveExplainSession(requested: string, known: string[], curren
 }
 
 function ensureExplainTurns(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(explain_turns)").all() as Array<{ name: string }>;
+  if (columns.length && !columns.some((column) => column.name === "path")) {
+    db.exec("ALTER TABLE explain_turns RENAME TO explain_turns_old");
+  }
   db.exec(`CREATE TABLE IF NOT EXISTS explain_turns (
     repo_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    side TEXT NOT NULL,
+    start_line INTEGER NOT NULL,
+    end_line INTEGER NOT NULL,
     position INTEGER NOT NULL,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
-    PRIMARY KEY (repo_id, session_id, position)
+    PRIMARY KEY (repo_id, session_id, path, side, start_line, end_line, position)
   )`);
+  const old = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'explain_turns_old'").get();
+  if (!old) return;
+  db.exec(`INSERT INTO explain_turns (repo_id, session_id, path, side, start_line, end_line, position, role, content)
+    SELECT repo_id, session_id, '', 'head', 0, 0, position, role, content FROM explain_turns_old`);
+  db.exec("DROP TABLE explain_turns_old");
 }
 
-export function loadTurns(db: DatabaseSync, repoId: string, sessionId: string): ExplainTurn[] {
+export function loadThread(db: DatabaseSync, repoId: string, sessionId: string, anchor: ExplainAnchor): ExplainTurn[] {
   ensureExplainTurns(db);
   const rows = db.prepare(
-    "SELECT role, content FROM explain_turns WHERE repo_id = ? AND session_id = ? ORDER BY position",
-  ).all(repoId, sessionId) as Array<{ role: string; content: string }>;
+    `SELECT role, content FROM explain_turns
+     WHERE repo_id = ? AND session_id = ? AND path = ? AND side = ? AND start_line = ? AND end_line = ?
+     ORDER BY position`,
+  ).all(repoId, sessionId, anchor.path, anchor.side, anchor.start, anchor.end) as Array<{ role: string; content: string }>;
   return rows
     .filter((row) => row.role === "user" || row.role === "assistant")
     .map((row) => ({ role: row.role as ExplainTurn["role"], content: row.content }));
 }
 
-export function saveTurns(db: DatabaseSync, repoId: string, sessionId: string, turns: ExplainTurn[]): void {
+export function loadThreads(db: DatabaseSync, repoId: string, sessionId: string): ExplainThread[] {
+  ensureExplainTurns(db);
+  const rows = db.prepare(
+    `SELECT path, side, start_line, end_line, role, content FROM explain_turns
+     WHERE repo_id = ? AND session_id = ? AND path != ''
+     ORDER BY path, side, start_line, end_line, position`,
+  ).all(repoId, sessionId) as Array<{ path: string; side: string; start_line: number; end_line: number; role: string; content: string }>;
+  const threads: ExplainThread[] = [];
+  for (const row of rows) {
+    if (row.role !== "user" && row.role !== "assistant") continue;
+    const side = row.side === "base" ? "base" : "head";
+    const last = threads[threads.length - 1];
+    const turn = { role: row.role as ExplainTurn["role"], content: row.content };
+    if (last && last.path === row.path && last.side === side && last.start === row.start_line && last.end === row.end_line) {
+      last.turns.push(turn);
+      continue;
+    }
+    threads.push({ path: row.path, side, start: row.start_line, end: row.end_line, turns: [turn] });
+  }
+  return threads;
+}
+
+export function saveThread(db: DatabaseSync, repoId: string, sessionId: string, anchor: ExplainAnchor, turns: ExplainTurn[]): void {
   ensureExplainTurns(db);
   const kept = turns.slice(-12);
   db.exec("BEGIN");
   try {
-    db.prepare("DELETE FROM explain_turns WHERE repo_id = ? AND session_id = ?").run(repoId, sessionId);
+    db.prepare(
+      "DELETE FROM explain_turns WHERE repo_id = ? AND session_id = ? AND path = ? AND side = ? AND start_line = ? AND end_line = ?",
+    ).run(repoId, sessionId, anchor.path, anchor.side, anchor.start, anchor.end);
     const insert = db.prepare(
-      "INSERT INTO explain_turns (repo_id, session_id, position, role, content) VALUES (?, ?, ?, ?, ?)",
+      `INSERT INTO explain_turns (repo_id, session_id, path, side, start_line, end_line, position, role, content)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
-    kept.forEach((turn, index) => insert.run(repoId, sessionId, index, turn.role, turn.content));
+    kept.forEach((turn, index) => insert.run(repoId, sessionId, anchor.path, anchor.side, anchor.start, anchor.end, index, turn.role, turn.content));
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
   }
+}
+
+export function loadTurns(db: DatabaseSync, repoId: string, sessionId: string): ExplainTurn[] {
+  return loadThread(db, repoId, sessionId, blankAnchor);
+}
+
+export function saveTurns(db: DatabaseSync, repoId: string, sessionId: string, turns: ExplainTurn[]): void {
+  saveThread(db, repoId, sessionId, blankAnchor, turns);
 }
 
 export async function explainInSession(
@@ -114,9 +227,12 @@ export async function explainInSession(
   sessionId: string,
   lines: CodeLine[],
   comment: string,
-): Promise<{ reply: string; turns: ExplainTurn[] }> {
+  anchor?: ExplainAnchor,
+): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor }> {
   if (!lines.length) throw new Error("先选中代码行");
-  const history = loadTurns(db, repoId, sessionId);
+  const target = anchor ?? anchorFor(lines);
+  if (!target) throw new Error("请选择同一侧连续的代码行");
+  const history = loadThread(db, repoId, sessionId, target);
   let reply = "";
   try {
     reply = (await completePrompt(sessionPrompt(history, lines, comment))).trim();
@@ -127,6 +243,6 @@ export async function explainInSession(
   }
   if (!reply) throw new Error("解释失败");
   const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: reply }].slice(-12);
-  saveTurns(db, repoId, sessionId, turns);
-  return { reply, turns };
+  saveThread(db, repoId, sessionId, target, turns);
+  return { reply, turns, anchor: target };
 }
