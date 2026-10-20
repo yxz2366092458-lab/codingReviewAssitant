@@ -40,7 +40,6 @@ import { explainInSession, loadTurns, normalizeLines, resolveExplainSession } fr
 import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
-import { summarizeDiff } from "./summary-ai.ts";
 import { openPanel } from "./panel.ts";
 import { findSymbols, readSource } from "./symbols.ts";
 
@@ -468,7 +467,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (file.binary) return summarizeFile(file, "");
     try {
       const text = await git(cwd, ["diff", "-U3", "--find-renames", ...diffArgs, "--", file.path]);
-      return summarizeDiff(file, text);
+      return summarizeFile(file, text);
     } catch {
       return summarizeFile(file, "");
     }

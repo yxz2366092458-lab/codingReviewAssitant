@@ -94,6 +94,14 @@ function renderWorkBranches(status) {
   $("development-branch").textContent = status.development || "未建立";
 }
 
+function shownBranches(status) {
+  if (state.scope === "session" && state.viewSession) {
+    const viewing = state.sessions.find((item) => item.sessionId === state.viewSession);
+    if (viewing) return viewing;
+  }
+  return status;
+}
+
 function renderRepoSelect() {
   const select = $("repo-select");
   select.replaceChildren();
@@ -182,7 +190,26 @@ function activeSessionId(sessions) {
   return sessions.current || "";
 }
 
+let refreshRunning = false;
+let refreshQueued = false;
+
 async function refresh() {
+  if (refreshRunning) {
+    refreshQueued = true;
+    return;
+  }
+  refreshRunning = true;
+  try {
+    do {
+      refreshQueued = false;
+      await loadPanel();
+    } while (refreshQueued);
+  } finally {
+    refreshRunning = false;
+  }
+}
+
+async function loadPanel() {
   const [status, gate, diff, slices, sessionPage] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
     api(`/repos/${state.repoId}/gate`),
@@ -219,7 +246,7 @@ async function refresh() {
   }
   state.signature = signature;
   renderSessions(active);
-  renderWorkBranches(status);
+  renderWorkBranches(shownBranches(status));
   $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
@@ -233,7 +260,7 @@ async function refresh() {
   else {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
-    showFileHead(gate.state === "awaiting_release" ? (gate.phase === "requirement" ? "还没有差异。需求准入之后才会出现这一段的代码。" : "还没有差异。放行之后才会出现这一段的代码。") : "", "");
+    showFileHead(emptyDiffText(gate), "");
     renderComment();
   }
 }
@@ -616,6 +643,12 @@ function renderSessions(active) {
   }
 }
 
+function emptyDiffText(gate) {
+  if (state.scope === "session") return "这个会话没有文件差异。";
+  if (gate.state !== "awaiting_release") return "";
+  return gate.phase === "requirement" ? "还没有差异。需求准入之后才会出现这一段的代码。" : "还没有差异。放行之后才会出现这一段的代码。";
+}
+
 function openSession(item) {
   state.viewSession = item.current ? "" : item.sessionId;
   state.scope = item.current ? "slice" : "session";
@@ -624,6 +657,11 @@ function openSession(item) {
   state.picked = [];
   state.anchor = "";
   state.signature = "";
+  renderSessions(item.sessionId);
+  if (!item.current) renderWorkBranches(item);
+  $("diff").replaceChildren();
+  $("viewbar").replaceChildren();
+  showFileHead(item.current ? "" : "正在打开这个会话的差异。", "");
   void refresh().catch(showError);
 }
 
@@ -646,7 +684,9 @@ function renderHistory(page) {
     row.addEventListener("click", () => {
       state.sliceId = slice.sliceId;
       state.scope = "slice";
+      state.viewSession = "";
       state.fileId = "";
+      state.signature = "";
       void refresh().catch(showError);
     });
     body.append(row);
