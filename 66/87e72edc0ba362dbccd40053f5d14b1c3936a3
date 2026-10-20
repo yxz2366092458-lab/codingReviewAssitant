@@ -1,0 +1,39 @@
+apps/daemon/src/git/lock.ts
+  s_2664ea1b16ddeb::t_69d0b16c710750 1-25
+apps/daemon/src/branches.ts
+  s_2664ea1b16ddeb::t_ac239b95734835 13-16
+  s_2664ea1b16ddeb::t_669fb10b37ef94 2
+apps/web/app.js
+  s_2664ea1b16ddeb::t_c2299e1a9b4789 346-347,349,355-368
+  s_2664ea1b16ddeb::t_d9feeea3824e2f 299-301
+apps/web/index.html
+  s_2664ea1b16ddeb::t_509a27834a9525 7
+  s_2664ea1b16ddeb::t_5a0c2960c33ff5 79
+test/git-lock.test.ts
+  s_2664ea1b16ddeb::t_4407a71df63908 1-31
+apps/daemon/src/git/runner.ts
+  s_2664ea1b16ddeb::t_68deee03a0726e 21-38
+  s_2664ea1b16ddeb::t_cdb0a067ca7226 2
+  s_2664ea1b16ddeb::t_31b2ef1cb846d5 39
+  s_2664ea1b16ddeb::t_54391fa2946537 18-20
+  s_2664ea1b16ddeb::t_55c4f0d2153d4d 1
+  s_2664ea1b16ddeb::t_819672c6ef5e32 3-5,15-17
+  s_2664ea1b16ddeb::t_337141d95187e8 40-42
+  s_2664ea1b16ddeb::t_c664502196e08e 6-14,43-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6687e72edc0ba362dbccd40053f5d14b1c3936a3",
+  "prompts": {},
+  "sessions": {
+    "s_2664ea1b16ddeb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d15644cb-47e7-4e44-a1e0-394c0e95a2b5",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
