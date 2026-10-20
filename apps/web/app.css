@@ -65,6 +65,15 @@ button.decision { min-width: 96px; }
 .kicker { font-size: 12px; margin: 12px 0 6px; }
 h1 { font-size: 22px; line-height: 1.4; margin: 0; font-weight: 600; }
 .round-label { margin: 8px 0 0; font-weight: 650; }
+.phase-label {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-weight: 650;
+}
+.phase-label.development { background: #e7f0ea; }
 .round-label.final {
   display: inline-block;
   margin-top: 10px;

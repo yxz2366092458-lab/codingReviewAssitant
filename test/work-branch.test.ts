@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { mergeFastForward } from "../apps/daemon/src/branches.ts";
-import { mergeWorkBranches, sessionBranchNames, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { admitSession, mergeWorkBranches, sessionBranchNames, sessionPhase, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
@@ -88,3 +88,27 @@ test("停在其他分支时，核对通过仍把开发分支合进需求分支",
   assert.equal(requirement, development);
   assert.equal(current, "main");
 });
+
+test("第一轮放行是需求准入，之后的新段是开发过程", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    admitted INTEGER NOT NULL DEFAULT 0,
+    requirement_slice TEXT,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    "session",
+    "req/demo",
+    "dev/demo",
+  );
+  assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-1"), "requirement");
+  admitSession(db, "repo", "dev/demo", "slice-1");
+  assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-1"), "requirement");
+  assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-2"), "development");
+});
+

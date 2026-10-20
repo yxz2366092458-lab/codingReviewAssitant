@@ -26,6 +26,14 @@ const labels = {
   rejected: "退回",
 };
 
+function gateLabel(gate) {
+  if (gate.lease === "revert") return "待撤回";
+  if (gate.phase === "requirement" && gate.state === "awaiting_release") return "待需求准入";
+  if (gate.phase === "development" && gate.state === "awaiting_release") return "待开发";
+  if (gate.phase === "development" && gate.state === "editing") return "开发中";
+  return labels[gate.state];
+}
+
 const $ = (id) => document.getElementById(id);
 
 async function api(path, options = {}) {
@@ -159,6 +167,7 @@ async function refresh() {
     lease: gate.lease,
     purpose: gate.slice?.purpose,
     finalRound: gate.finalRound,
+    phase: gate.phase,
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
@@ -173,7 +182,7 @@ async function refresh() {
   if (signature === state.signature) return;
   state.signature = signature;
   renderWorkBranches(status);
-  $("gate-label").textContent = gate.lease === "revert" ? "待撤回" : labels[gate.state];
+  $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
   });
@@ -186,7 +195,7 @@ async function refresh() {
   else {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
-    showFileHead(gate.state === "awaiting_release" ? "还没有差异。放行之后才会出现这一段的代码。" : "", "");
+    showFileHead(gate.state === "awaiting_release" ? (gate.phase === "requirement" ? "还没有差异。需求准入之后才会出现这一段的代码。" : "还没有差异。放行之后才会出现这一段的代码。") : "", "");
   }
 }
 
@@ -198,13 +207,17 @@ function renderSummary(gate) {
   round.hidden = gate.finalRound !== true && gate.finalRound !== false;
   round.textContent = gate.finalRound === true ? "最后一轮" : gate.finalRound === false ? "不是最后一轮" : "";
   round.classList.toggle("final", gate.finalRound === true);
+  const phase = $("phase-label");
+  phase.hidden = gate.phase !== "requirement" && gate.phase !== "development";
+  phase.textContent = gate.phase === "requirement" ? "需求准入" : gate.phase === "development" ? "开发过程" : "";
+  phase.classList.toggle("development", gate.phase === "development");
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
   decisions.replaceChildren();
   const show = gate.state === "awaiting_release" || gate.state === "awaiting_review";
   wrap.hidden = !show;
   if (!show || !slice) return;
-  const primary = gate.state === "awaiting_release" ? "放行" : "核对通过";
+  const primary = gate.state !== "awaiting_release" ? "核对通过" : gate.phase === "requirement" ? "需求准入" : "放行";
   decisions.append(decision(primary, () => act(gate.state === "awaiting_release" ? "release" : "ack", slice.sliceId)));
   decisions.append(decision("退回", () => act("reject", slice.sliceId)));
   const banner = $("banner");

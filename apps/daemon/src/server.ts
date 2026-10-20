@@ -35,7 +35,7 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
-import { mergeWorkBranches, openWorkBranches, readWorkBranches } from "./work-branch.ts";
+import { admitSession, mergeWorkBranches, openWorkBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { summarizeDiff } from "./summary-ai.ts";
@@ -253,7 +253,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "gate") {
-      sendJson(res, 200, present(gateView(db, repo.id)));
+      const view = gateView(db, repo.id);
+      const head = await headBranch(repo.path);
+      if (view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
+        admitSession(db, repo.id, head, view.slice.sliceId);
+      }
+      sendJson(res, 200, { ...present(view), phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null) });
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {
@@ -279,7 +284,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "POST" && rest === "gate/release") {
       const body = await readJson(req);
-      publishAfter(repo.id, await release(db, repo.path, String(body.sliceId ?? "")));
+      const released = await release(db, repo.path, String(body.sliceId ?? ""));
+      admitSession(db, repo.id, await headBranch(repo.path), String(body.sliceId ?? ""));
+      publishAfter(repo.id, released);
       sendJson(res, 200, gateView(db, repo.id));
       return;
     }

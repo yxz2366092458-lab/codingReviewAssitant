@@ -58,6 +58,46 @@ export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: s
   await mergeFastForward(cwd, pair.requirement, pair.development);
 }
 
+export function sessionPhase(
+  db: DatabaseSync,
+  repoId: string,
+  headBranch: string,
+  sliceId: string | null,
+): "requirement" | "development" | null {
+  const row = readRecord(db, repoId, headBranch);
+  if (!row) return null;
+  if (!row.admitted || (sliceId && row.requirement_slice === sliceId)) return "requirement";
+  return "development";
+}
+
+export function admitSession(db: DatabaseSync, repoId: string, headBranch: string, sliceId: string): void {
+  const row = readRecord(db, repoId, headBranch);
+  if (!row || row.admitted) return;
+  db.prepare("UPDATE work_branches SET admitted = 1, requirement_slice = ? WHERE repo_id = ? AND development = ?").run(
+    sliceId,
+    repoId,
+    row.development,
+  );
+}
+
+function readRecord(db: DatabaseSync, repoId: string, headBranch: string) {
+  ensureWorkBranches(db);
+  const rows = db.prepare(
+    "SELECT requirement, development, admitted, requirement_slice FROM work_branches WHERE repo_id = ?",
+  ).all(repoId) as Array<{
+    requirement: string;
+    development: string;
+    admitted: number;
+    requirement_slice: string | null;
+  }>;
+  if (!rows.length) return null;
+  if (headBranch) {
+    const match = rows.find((row) => row.development === headBranch);
+    if (match) return match;
+  }
+  return rows[rows.length - 1] ?? null;
+}
+
 function ensureWorkBranches(db: DatabaseSync): void {
   const create = () => {
     db.exec(`CREATE TABLE IF NOT EXISTS work_branches (
@@ -65,6 +105,8 @@ function ensureWorkBranches(db: DatabaseSync): void {
       session_id TEXT NOT NULL,
       requirement TEXT NOT NULL,
       development TEXT NOT NULL,
+      admitted INTEGER NOT NULL DEFAULT 0,
+      requirement_slice TEXT,
       PRIMARY KEY (repo_id, session_id)
     )`);
   };
@@ -76,11 +118,19 @@ function ensureWorkBranches(db: DatabaseSync): void {
     return;
   }
   const columns = db.prepare("PRAGMA table_info(work_branches)").all() as Array<{ name: string }>;
-  if (columns.some((column) => column.name === "session_id")) return;
-  db.exec("ALTER TABLE work_branches RENAME TO work_branches_old");
-  create();
-  db.exec(
-    "INSERT INTO work_branches (repo_id, session_id, requirement, development) SELECT repo_id, '', requirement, development FROM work_branches_old",
-  );
-  db.exec("DROP TABLE work_branches_old");
+  if (!columns.some((column) => column.name === "session_id")) {
+    db.exec("ALTER TABLE work_branches RENAME TO work_branches_old");
+    create();
+    db.exec(
+      "INSERT INTO work_branches (repo_id, session_id, requirement, development) SELECT repo_id, '', requirement, development FROM work_branches_old",
+    );
+    db.exec("DROP TABLE work_branches_old");
+  }
+  const ready = db.prepare("PRAGMA table_info(work_branches)").all() as Array<{ name: string }>;
+  if (!ready.some((column) => column.name === "admitted")) {
+    db.exec("ALTER TABLE work_branches ADD COLUMN admitted INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!ready.some((column) => column.name === "requirement_slice")) {
+    db.exec("ALTER TABLE work_branches ADD COLUMN requirement_slice TEXT");
+  }
 }
