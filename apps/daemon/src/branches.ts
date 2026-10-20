@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { enqueueGit, retryOnIndexLock } from "./git/lock.ts";
 
 export function assertBranchName(name: string): string {
   const branch = name.trim();
@@ -9,6 +10,10 @@ export function assertBranchName(name: string): string {
 }
 
 function runGit(cwd: string, args: string[]): Promise<string> {
+  return enqueueGit(() => retryOnIndexLock(() => runGitOnce(cwd, args)));
+}
+
+function runGitOnce(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
