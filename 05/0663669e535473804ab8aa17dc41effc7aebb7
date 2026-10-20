@@ -1,0 +1,37 @@
+apps/daemon/src/branches.ts
+  s_5f3d8f56fde9b6::t_0801c0769f505e 39-58
+apps/web/app.js
+  s_5f3d8f56fde9b6::t_86e1f6ddf029ab 85-86
+apps/daemon/src/work-branch.ts
+  s_5f3d8f56fde9b6::t_a4ef589b2b72be 1-20,22-32,34-49
+  s_5f3d8f56fde9b6::t_f46ecb7c8cccf8 21,33
+test/work-branch.test.ts
+  s_5f3d8f56fde9b6::t_b5b5946c78593c 2-5,7,10-13,19-45
+  s_5f3d8f56fde9b6::t_c2ecfa6406e484 1,6,8-9,14-18,46
+apps/cli/review-gate.ts
+  s_5f3d8f56fde9b6::t_5e374f7ad32e63 31-37
+  s_5f3d8f56fde9b6::t_453fe5d122b449 71
+apps/daemon/src/server.ts
+  s_5f3d8f56fde9b6::t_fd01a4e6b3a404 281
+  s_5f3d8f56fde9b6::t_e954f7d05784b5 361-365
+  s_5f3d8f56fde9b6::t_46ee684d6cce9b 211-219
+  s_5f3d8f56fde9b6::t_727d1154ae1017 36
+  s_5f3d8f56fde9b6::t_be0211c4009834 380-384
+  s_5f3d8f56fde9b6::t_310c744f59da98 236-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "050663669e535473804ab8aa17dc41effc7aebb7",
+  "prompts": {},
+  "sessions": {
+    "s_5f3d8f56fde9b6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c39dda95-5a27-42ce-9123-194b6979821f",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
