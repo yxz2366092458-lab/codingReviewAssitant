@@ -3,9 +3,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { mergeFastForward } from "../apps/daemon/src/branches.ts";
-import { sessionBranchNames, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { mergeWorkBranches, sessionBranchNames, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
@@ -50,4 +51,40 @@ test("准入合并后，分支对比只剩下还没合并的提交", async () =>
   git(cwd, ["commit", "-m", "next"]);
   const next = execFileSync("git", ["diff", "--name-only", `${pair.requirement}...${pair.development}`], { cwd }).toString().trim();
   assert.equal(next, "c.txt");
+});
+
+test("停在其他分支时，核对通过仍把开发分支合进需求分支", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-merge-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "req/demo"]);
+  git(cwd, ["switch", "-c", "dev/demo"]);
+  writeFileSync(join(cwd, "b.txt"), "b\n");
+  git(cwd, ["add", "b.txt"]);
+  git(cwd, ["commit", "-m", "feature"]);
+  git(cwd, ["switch", "main"]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    "session",
+    "req/demo",
+    "dev/demo",
+  );
+  await mergeWorkBranches(db, cwd, "repo", "main");
+  const requirement = execFileSync("git", ["rev-parse", "req/demo"], { cwd }).toString().trim();
+  const development = execFileSync("git", ["rev-parse", "dev/demo"], { cwd }).toString().trim();
+  const current = execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim();
+  assert.equal(requirement, development);
+  assert.equal(current, "main");
 });

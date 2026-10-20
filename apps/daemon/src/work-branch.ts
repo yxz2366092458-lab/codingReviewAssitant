@@ -54,7 +54,7 @@ export async function openWorkBranches(
 
 export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: string, headBranch: string): Promise<void> {
   const pair = readWorkBranches(db, repoId, headBranch);
-  if (!pair || pair.development !== headBranch) return;
+  if (!pair) return;
   await mergeFastForward(cwd, pair.requirement, pair.development);
 }
 
