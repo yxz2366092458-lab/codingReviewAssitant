@@ -35,8 +35,8 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
-import { explainInSession, normalizeLines } from "./explain.ts";
-import { admitSession, currentSessionId, mergeWorkBranches, openWorkBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
+import { explainInSession, loadTurns, normalizeLines, resolveExplainSession } from "./explain.ts";
+import { admitSession, currentSessionId, listWorkSessions, mergeWorkBranches, openWorkBranches, readSessionBranches, readWorkBranches, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { summarizeDiff } from "./summary-ai.ts";
@@ -207,6 +207,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     const rest = repoMatch[2] ?? "";
     const scope = url.searchParams.get("scope") ?? "slice";
     const sliceId = url.searchParams.get("sliceId");
+    const sessionQuery = url.searchParams.get("sessionId");
 
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
@@ -322,6 +323,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       sendJson(res, 200, { installed: true });
       return;
     }
+    if (req.method === "GET" && rest === "sessions") {
+      const head = await headBranch(repo.path);
+      const sessions = listWorkSessions(db, repo.id, head);
+      sendJson(res, 200, { sessions, current: currentSessionId(db, repo.id, head) });
+      return;
+    }
     if (req.method === "GET" && rest === "slices") {
       const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
       sendJson(res, 200, {
@@ -333,8 +340,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "diff") {
-      const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId);
-      const args = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId);
+      const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId, sessionQuery);
+      const args = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId, sessionQuery);
       const summarized = await Promise.all(
         files.map(async (file) => ({ ...file, summary: await fileSummary(repo.path, args, file) })),
       );
@@ -344,7 +351,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     const patchMatch = /^files\/([^/]+)\/patch$/.exec(rest);
     if (req.method === "GET" && patchMatch) {
       const filePath = decodeURIComponent(patchMatch[1] ?? "");
-      const diffArgs = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId);
+      const diffArgs = await diffArgsFor(repo.path, repo.base_ref, repo.id, scope, sliceId, sessionQuery);
       const patch = await patchRange(repo.path, diffArgs, filePath);
       sendJson(res, 200, { fileId: fileIdFor(filePath), path: filePath, ...patch });
       return;
@@ -360,13 +367,18 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       sendJson(res, 200, readSource(repo.path, url.searchParams.get("path") ?? "", Number(url.searchParams.get("line") ?? "1")));
       return;
     }
+    if (req.method === "GET" && rest === "explain") {
+      const session = explainSession(repo.id, await headBranch(repo.path), sessionQuery ?? "");
+      sendJson(res, 200, { sessionId: session, turns: loadTurns(db, repo.id, session) });
+      return;
+    }
     if (req.method === "POST" && rest === "explain") {
       const body = await readJson(req);
       const lines = normalizeLines(body.lines);
       if (!lines.length) throw new GateError(400, "先选中代码行");
-      const session = currentSessionId(db, repo.id, await headBranch(repo.path));
-      const result = await explainInSession(`${repo.id}:${session || "panel"}`, lines, String(body.comment ?? ""));
-      sendJson(res, 200, result);
+      const session = explainSession(repo.id, await headBranch(repo.path), String(body.sessionId ?? ""));
+      const result = await explainInSession(db, repo.id, session, lines, String(body.comment ?? ""));
+      sendJson(res, 200, { sessionId: session, ...result });
       return;
     }
     sendJson(res, 404, { error: "没有这个地址" });
@@ -395,8 +407,21 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
-  async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null) {
+  function explainSession(repoId: string, head: string, requested: string): string {
+    const known = listWorkSessions(db, repoId, head).map((item) => item.sessionId);
     try {
+      return resolveExplainSession(requested, known, currentSessionId(db, repoId, head));
+    } catch (error) {
+      throw new GateError(404, error instanceof Error ? error.message : "没有这个会话");
+    }
+  }
+
+  async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null) {
+    try {
+      if (scope === "session") {
+        const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
+        return pair ? await listRange(cwd, pair.requirement, pair.development) : [];
+      }
       if (scope === "branch") {
         const pair = readWorkBranches(db, repoId, await headBranch(cwd));
         if (pair) return await listRange(cwd, pair.requirement, pair.development);
@@ -415,7 +440,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
-  async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null): Promise<string[]> {
+  async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null): Promise<string[]> {
+    if (scope === "session") {
+      const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
+      return pair ? [`${pair.requirement}...${pair.development}`] : ["HEAD"];
+    }
     if (scope === "branch") {
       const pair = readWorkBranches(db, repoId, await headBranch(cwd));
       if (pair) return [`${pair.requirement}...${pair.development}`];

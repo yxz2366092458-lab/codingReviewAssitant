@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { completePrompt } from "./summary-ai.ts";
 
 export type CodeLine = {
@@ -61,13 +62,61 @@ export function threadFor(key: string): ExplainTurn[] {
   return threads.get(key) ?? [];
 }
 
+export function resolveExplainSession(requested: string, known: string[], current: string): string {
+  const id = requested.trim();
+  const fallback = current.trim() || "panel";
+  if (!id || id === fallback) return fallback;
+  if (known.includes(id)) return id;
+  throw new Error("没有这个会话");
+}
+
+function ensureExplainTurns(db: DatabaseSync): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS explain_turns (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id, position)
+  )`);
+}
+
+export function loadTurns(db: DatabaseSync, repoId: string, sessionId: string): ExplainTurn[] {
+  ensureExplainTurns(db);
+  const rows = db.prepare(
+    "SELECT role, content FROM explain_turns WHERE repo_id = ? AND session_id = ? ORDER BY position",
+  ).all(repoId, sessionId) as Array<{ role: string; content: string }>;
+  return rows
+    .filter((row) => row.role === "user" || row.role === "assistant")
+    .map((row) => ({ role: row.role as ExplainTurn["role"], content: row.content }));
+}
+
+export function saveTurns(db: DatabaseSync, repoId: string, sessionId: string, turns: ExplainTurn[]): void {
+  ensureExplainTurns(db);
+  const kept = turns.slice(-12);
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM explain_turns WHERE repo_id = ? AND session_id = ?").run(repoId, sessionId);
+    const insert = db.prepare(
+      "INSERT INTO explain_turns (repo_id, session_id, position, role, content) VALUES (?, ?, ?, ?, ?)",
+    );
+    kept.forEach((turn, index) => insert.run(repoId, sessionId, index, turn.role, turn.content));
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export async function explainInSession(
-  key: string,
+  db: DatabaseSync,
+  repoId: string,
+  sessionId: string,
   lines: CodeLine[],
   comment: string,
 ): Promise<{ reply: string; turns: ExplainTurn[] }> {
   if (!lines.length) throw new Error("先选中代码行");
-  const history = threadFor(key);
+  const history = loadTurns(db, repoId, sessionId);
   let reply = "";
   try {
     reply = (await completePrompt(sessionPrompt(history, lines, comment))).trim();
@@ -77,6 +126,7 @@ export async function explainInSession(
     throw error;
   }
   if (!reply) throw new Error("解释失败");
-  const turns = remember(key, history, lines, comment, reply);
+  const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: reply }].slice(-12);
+  saveTurns(db, repoId, sessionId, turns);
   return { reply, turns };
 }

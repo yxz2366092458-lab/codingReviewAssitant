@@ -58,6 +58,38 @@ export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: s
   await mergeFastForward(cwd, pair.requirement, pair.development);
 }
 
+export type WorkSession = {
+  sessionId: string;
+  requirement: string;
+  development: string;
+  current: boolean;
+};
+
+export function listWorkSessions(db: DatabaseSync, repoId: string, headBranch: string): WorkSession[] {
+  ensureWorkBranches(db);
+  const rows = db.prepare(
+    "SELECT session_id, requirement, development FROM work_branches WHERE repo_id = ? ORDER BY rowid DESC",
+  ).all(repoId) as Array<{ session_id: string; requirement: string; development: string }>;
+  return rows
+    .filter((row) => row.session_id.trim())
+    .map((row) => ({
+      sessionId: row.session_id.trim(),
+      requirement: row.requirement,
+      development: row.development,
+      current: headBranch !== "" && row.development === headBranch,
+    }));
+}
+
+export function readSessionBranches(
+  db: DatabaseSync,
+  repoId: string,
+  sessionId: string,
+): { requirement: string; development: string } | null {
+  const match = listWorkSessions(db, repoId, "").find((item) => item.sessionId === sessionId.trim());
+  if (!match) return null;
+  return { requirement: match.requirement, development: match.development };
+}
+
 export function currentSessionId(db: DatabaseSync, repoId: string, headBranch: string): string {
   ensureWorkBranches(db);
   const rows = db.prepare("SELECT session_id, development FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{

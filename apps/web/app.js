@@ -16,6 +16,9 @@ const state = {
   picked: [],
   anchor: "",
   explainTurns: [],
+  viewSession: "",
+  loadedExplainSession: "",
+  sessions: [],
 };
 
 let events = null;
@@ -148,6 +151,9 @@ function resetView() {
   state.picked = [];
   state.anchor = "";
   state.explainTurns = [];
+  state.viewSession = "";
+  state.loadedExplainSession = "";
+  state.sessions = [];
   $("source").hidden = true;
   renderComment();
   $("diff").replaceChildren();
@@ -163,13 +169,29 @@ function connect() {
   events.addEventListener("message", () => void refresh().catch(showError));
 }
 
+function diffQuery() {
+  const params = new URLSearchParams();
+  params.set("scope", state.scope);
+  if (state.sliceId && state.scope === "slice") params.set("sliceId", state.sliceId);
+  if (state.scope === "session" && state.viewSession) params.set("sessionId", state.viewSession);
+  return params.toString();
+}
+
+function activeSessionId(sessions) {
+  if (state.scope === "session" && state.viewSession) return state.viewSession;
+  return sessions.current || "";
+}
+
 async function refresh() {
-  const [status, gate, diff, slices] = await Promise.all([
+  const [status, gate, diff, slices, sessionPage] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
     api(`/repos/${state.repoId}/gate`),
-    api(`/repos/${state.repoId}/diff?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`),
+    api(`/repos/${state.repoId}/diff?${diffQuery()}`),
     api(`/repos/${state.repoId}/slices?page=${state.historyPage}`),
+    api(`/repos/${state.repoId}/sessions`),
   ]);
+  state.sessions = sessionPage.sessions ?? [];
+  const active = activeSessionId(sessionPage);
   const signature = JSON.stringify({
     gate: gate.state,
     lease: gate.lease,
@@ -183,12 +205,20 @@ async function refresh() {
     development: status.development,
     historyPage: slices.page,
     history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
+    sessions: state.sessions.map((item) => `${item.sessionId}:${item.current}`).join(","),
+    active,
     fileId: state.fileId,
     symbol: state.symbol,
     locations: state.locations.map((item) => `${item.path}:${item.line}`),
   });
   if (signature === state.signature) return;
+  if (active !== state.loadedExplainSession) {
+    const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
+    state.explainTurns = thread.turns ?? [];
+    state.loadedExplainSession = active;
+  }
   state.signature = signature;
+  renderSessions(active);
   renderWorkBranches(status);
   $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
@@ -204,6 +234,7 @@ async function refresh() {
     $("diff").replaceChildren();
     $("viewbar").replaceChildren();
     showFileHead(gate.state === "awaiting_release" ? (gate.phase === "requirement" ? "还没有差异。需求准入之后才会出现这一段的代码。" : "还没有差异。放行之后才会出现这一段的代码。") : "", "");
+    renderComment();
   }
 }
 
@@ -295,7 +326,7 @@ function renderFiles(files) {
 }
 
 async function renderPatch() {
-  const patch = await api(`/repos/${state.repoId}/files/${state.fileId}/patch?scope=${state.scope}${state.sliceId ? `&sliceId=${state.sliceId}` : ""}`);
+  const patch = await api(`/repos/${state.repoId}/files/${state.fileId}/patch?${diffQuery()}`);
   const file = state.files.find((item) => item.fileId === state.fileId);
   showFileHead(patch.truncated ? `${patch.path} · 补丁过大，只保留清单` : patch.path, file?.summary ?? "");
   renderViewbar();
@@ -491,7 +522,9 @@ function renderComment() {
   const count = selectedLines().length;
   const dock = $("comment");
   dock.hidden = count === 0 && state.explainTurns.length === 0;
-  $("comment-selection").textContent = count ? `已选 ${count} 行。评论后由当前会话解释作用。` : "当前会话里的解释";
+  const viewing = state.sessions.find((item) => item.sessionId === state.loadedExplainSession);
+  const sessionName = state.scope === "session" && viewing ? viewing.development : "当前会话";
+  $("comment-selection").textContent = count ? `已选 ${count} 行。评论后由${sessionName}解释作用。` : `${sessionName}里的解释`;
   const thread = $("comment-thread");
   thread.replaceChildren();
   for (const turn of state.explainTurns) {
@@ -510,13 +543,14 @@ async function sendComment() {
   }
   const button = $("comment-send");
   button.disabled = true;
-  showNotice("正在让当前会话解释选中的代码。");
+  showNotice("正在让这个会话解释选中的代码。");
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
       method: "POST",
-      body: JSON.stringify({ lines, comment: $("comment-text").value }),
+      body: JSON.stringify({ lines, comment: $("comment-text").value, sessionId: state.loadedExplainSession }),
     });
     state.explainTurns = result.turns ?? [];
+    if (result.sessionId) state.loadedExplainSession = result.sessionId;
     $("comment-text").value = "";
     showNotice("");
     renderComment();
@@ -559,6 +593,38 @@ function identifierFrom(event) {
   if (range && row.contains(range.startContainer)) offset = range.startOffset;
   const match = [...text.matchAll(/[A-Za-z_$][\w$]*/g)].find((item) => offset >= item.index && offset <= item.index + item[0].length);
   return match?.[0] ?? [...text.matchAll(/[A-Za-z_$][\w$]*/g)].at(-1)?.[0] ?? "";
+}
+
+function renderSessions(active) {
+  const box = $("sessions");
+  box.replaceChildren();
+  if (state.sessions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "还没有可以回看的会话。";
+    box.append(empty);
+    return;
+  }
+  for (const item of state.sessions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = item.current ? `${item.development} · 当前` : item.development;
+    button.title = item.sessionId;
+    button.classList.toggle("active", item.sessionId === active);
+    button.addEventListener("click", () => openSession(item));
+    box.append(button);
+  }
+}
+
+function openSession(item) {
+  state.viewSession = item.current ? "" : item.sessionId;
+  state.scope = item.current ? "slice" : "session";
+  state.sliceId = "";
+  state.fileId = "";
+  state.picked = [];
+  state.anchor = "";
+  state.signature = "";
+  void refresh().catch(showError);
 }
 
 function renderHistory(page) {
@@ -634,6 +700,10 @@ document.addEventListener("click", (event) => {
     state.scope = scope.dataset.scope;
     state.sliceId = "";
     state.fileId = "";
+    state.viewSession = "";
+    state.picked = [];
+    state.anchor = "";
+    state.signature = "";
     void refresh().catch(showError);
     return;
   }
