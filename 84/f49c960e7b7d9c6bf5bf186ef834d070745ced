@@ -1,0 +1,24 @@
+apps/daemon/src/server.ts
+  s_ed3be51ab82d8d::t_7c7f8e76ac7bb3 44
+  s_ed3be51ab82d8d::t_9bf9b29a1bf3ba 388-399
+test/local-file.test.ts
+  s_ed3be51ab82d8d::t_b492046c931097 1-25
+apps/daemon/src/local-file.ts
+  s_ed3be51ab82d8d::t_71d28cdfcd9e4d 1-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "84f49c960e7b7d9c6bf5bf186ef834d070745ced",
+  "prompts": {},
+  "sessions": {
+    "s_ed3be51ab82d8d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ef1e591d-0871-4431-9db4-4a3a5678b9b1",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
