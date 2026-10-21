@@ -375,6 +375,30 @@ function showFileHead(pathText, summary) {
   node.textContent = summary;
 }
 
+function classNameOf(path) {
+  return path.split("/").filter(Boolean).pop() || path;
+}
+
+async function copyClassName(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  button.textContent = "已复制";
+  setTimeout(() => {
+    if (button.isConnected) button.textContent = "复制";
+  }, 1200);
+}
+
 function renderFiles(files) {
   const aside = $("files");
   aside.replaceChildren();
@@ -388,11 +412,24 @@ function renderFiles(files) {
   for (const file of files) {
     const row = document.createElement("div");
     row.className = `file${file.fileId === state.fileId ? " selected" : ""}`;
+    const label = classNameOf(file.path);
     const name = document.createElement("span");
-    name.textContent = file.path.split("/").pop();
+    name.className = "file-name";
+    name.textContent = label;
+    name.title = label;
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "copy-name";
+    copy.textContent = "复制";
+    copy.title = "复制类名";
+    copy.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void copyClassName(label, copy);
+    });
     const stat = document.createElement("small");
     stat.textContent = `+${file.additions} -${file.deletions}`;
-    row.append(name, stat);
+    row.append(name, copy, stat);
     row.addEventListener("click", () => {
       state.fileId = file.fileId;
       state.source = "";

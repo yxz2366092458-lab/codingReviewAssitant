@@ -96,17 +96,32 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .state { font-weight: 650; }
 .banner { background: var(--fill); padding: 8px 10px; }
 .workspace { display: grid; grid-template-columns: 240px 1fr; min-height: 360px; background: var(--panel); }
-#files { border-right: 1px solid var(--line); padding: 8px; }
+#files { border-right: 1px solid var(--line); padding: 8px; min-width: 0; }
 .file {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
   padding: 6px 8px;
   cursor: pointer;
   border-radius: 6px;
 }
 .file.selected { background: var(--fill); }
-.file small { color: var(--muted); }
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copy-name {
+  flex: none;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.file small { color: var(--muted); flex: none; }
 .file-summary { margin: 6px 0 0; line-height: 1.6; white-space: pre-wrap; }
 #locations { color: var(--muted); font-size: 13px; }
 .loc { cursor: pointer; text-decoration: underline; margin-right: 10px; }
