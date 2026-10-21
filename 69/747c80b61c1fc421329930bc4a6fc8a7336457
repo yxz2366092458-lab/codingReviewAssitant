@@ -1,0 +1,38 @@
+apps/cli/review-gate.ts
+  s_2eacced4df0489::t_df53988b28b52f 6-7
+  s_2eacced4df0489::t_7c75673c75b989 22-35,40,45
+  s_2eacced4df0489::t_270805af2085c9 123-130
+  s_2eacced4df0489::t_349988edcfe7ae 46
+  s_2eacced4df0489::t_f34bf43a0caa3e 91-92
+apps/web/app.js
+  s_2eacced4df0489::t_5fbe850c1dd504 1147
+apps/daemon/src/server.ts
+  s_2eacced4df0489::t_c3516c9ea89c9b 340
+test/user-hook.test.ts
+  s_2eacced4df0489::t_7540fc3b31f37b 1-47
+apps/daemon/src/hook-target.ts
+  s_2eacced4df0489::t_762f074e285d76 1-79
+apps/daemon/src/adapters/install.ts
+  s_2eacced4df0489::t_3988baf1f922eb 2-34
+  s_2eacced4df0489::t_8a8f8a9e53931f 1
+  s_2eacced4df0489::t_b0bdd5960588a1 35-37
+  s_2eacced4df0489::t_6330dd84e71f62 38-42
+apps/daemon/src/gate/policy.ts
+  s_2eacced4df0489::t_47fb0c05670028 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "69747c80b61c1fc421329930bc4a6fc8a7336457",
+  "prompts": {},
+  "sessions": {
+    "s_2eacced4df0489": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fe481c68-3178-407e-a99a-1e1f651af8b7",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
