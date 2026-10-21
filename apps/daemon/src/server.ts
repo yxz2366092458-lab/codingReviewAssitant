@@ -41,6 +41,7 @@ import { admitSession, currentSessionId, listWorkSessions, mergeRequirementIntoB
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
+import { readLocalLines } from "./local-file.ts";
 import { findSymbols, readSource } from "./symbols.ts";
 
 type SocketClient = { send: (text: string) => void };
@@ -382,6 +383,18 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "GET" && rest === "source") {
       sendJson(res, 200, readSource(repo.path, url.searchParams.get("path") ?? "", Number(url.searchParams.get("line") ?? "1")));
+      return;
+    }
+    if (req.method === "GET" && rest === "local-file") {
+      const filePath = url.searchParams.get("path") ?? "";
+      const from = Number(url.searchParams.get("from") ?? "1");
+      const to = Number(url.searchParams.get("to") ?? "0");
+      try {
+        sendJson(res, 200, readLocalLines(repo.path, filePath, from, to));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "读不到本地文件";
+        throw new GateError(400, message);
+      }
       return;
     }
     if (req.method === "GET" && rest === "explain") {
