@@ -1,0 +1,35 @@
+apps/daemon/src/gate/machine.ts
+  s_2664ea1b16ddeb::t_f7724a2c47081e 24,30,55,68,75,99,114,134,141-153,168,174
+  s_2664ea1b16ddeb::t_ab96226bce159c 110-112
+  s_2664ea1b16ddeb::t_20365092c50d85 21-23
+  s_2664ea1b16ddeb::t_3c3075addaf19e 25-29
+  s_2664ea1b16ddeb::t_797d4c23f066af 31-33,52-54
+  s_2664ea1b16ddeb::t_6488cfc1c0a408 56-58,65-67
+  s_2664ea1b16ddeb::t_ae7d94302aecd7 69-74
+  s_2664ea1b16ddeb::t_fc56d233c4a68e 76-78,96-98
+  s_2664ea1b16ddeb::t_0c34ab1296fe30 100-102,107-109
+  s_2664ea1b16ddeb::t_b1e3c709331d4d 113
+  s_2664ea1b16ddeb::t_92a3213576ee01 115-117,131-133
+  s_2664ea1b16ddeb::t_3746adc2769c64 135-140
+  s_2664ea1b16ddeb::t_657a864364f143 154-156,165-167
+  s_2664ea1b16ddeb::t_3ebe69c2c4fde5 169-173
+  s_2664ea1b16ddeb::t_8c407f3e6e8323 1-20,34-51,59-64,79-95,103-106,118-130,157-164
+test/complete-count.test.ts
+  s_2664ea1b16ddeb::t_45a64092ba0560 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "952575b125fb3837d592af2c363ea1b4745f38ab",
+  "prompts": {},
+  "sessions": {
+    "s_2664ea1b16ddeb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d15644cb-47e7-4e44-a1e0-394c0e95a2b5",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
