@@ -337,7 +337,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "POST" && rest === "gate/install") {
-      installGate(repo.path, cliPath);
+      installGate(cliPath);
       sendJson(res, 200, { installed: true });
       return;
     }

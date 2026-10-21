@@ -3,6 +3,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { decide, normalizeToolCall } from "../daemon/src/gate/policy.ts";
+import { hookProjectDir } from "../daemon/src/hook-target.ts";
 
 const home = process.env.REVIEW_HOME ?? join(homedir(), "Library/Application Support/CodingReviewAssistant");
 const infoPath = join(home, "daemon.json");
@@ -13,20 +15,34 @@ if (!existsSync(infoPath)) {
   process.exit(1);
 }
 const info = JSON.parse(readFileSync(infoPath, "utf8"));
-const root = git(["rev-parse", "--show-toplevel"]).trim();
 
 if (command === "check-tool") {
   const raw = await readStdin();
   const payload = raw.trim() ? JSON.parse(raw) : {};
-  const result = await call("POST", `/repos/${await repoId()}/gate/check`, payload);
+  let root = "";
+  try {
+    root = git(["rev-parse", "--show-toplevel"], hookProjectDir(payload)).trim();
+  } catch {
+    const verdict = decide(normalizeToolCall(payload), "locked", null);
+    if (verdict.permission === "allow") {
+      process.stdout.write(JSON.stringify({ permission: "allow", user_message: "", agent_message: "" }));
+      process.exit(0);
+    }
+    const message = "找不到这次编辑所在的 Git 仓库，门禁无法放行。";
+    process.stdout.write(JSON.stringify({ permission: "deny", user_message: message, agent_message: told(message) }));
+    process.exit(2);
+  }
+  const result = await call("POST", `/repos/${await repoId(root)}/gate/check`, payload);
   const denied = result.permission === "deny";
   process.stdout.write(JSON.stringify({
     permission: result.permission,
     user_message: denied ? result.message : "",
-    agent_message: denied ? result.message : "",
+    agent_message: denied ? told(result.message) : "",
   }));
   process.exit(denied ? 2 : 0);
 }
+
+const root = git(["rev-parse", "--show-toplevel"]).trim();
 
 if (command === "start") {
   const name = rest.join(" ").trim();
@@ -72,11 +88,10 @@ if (command === "complete") {
 process.stderr.write("用法：review-gate start \"需求名\" | intend \"作用\" [--final] | wait | complete | check-tool\n");
 process.exit(1);
 
-async function repoId() {
-  const registered = await call("POST", "/repos", { path: root });
+async function repoId(path) {
+  const registered = await call("POST", "/repos", { path: path ?? root });
   return registered.repoId;
 }
-
 async function call(method, path, body) {
   const response = await fetch(`http://127.0.0.1:${info.port}${path}`, {
     method,
@@ -105,8 +120,14 @@ async function callOptional(method, path) {
   return payload;
 }
 
-function git(args) {
-  return execFileSync("git", args, { encoding: "utf8" });
+function git(args, cwd) {
+  return execFileSync("git", args, { encoding: "utf8", cwd });
+}
+
+function told(message) {
+  const cli = process.argv[1];
+  if (!cli) return message;
+  return `${message} 在项目目录执行：node --experimental-strip-types ${cli} intend "作用"，然后 wait。`;
 }
 
 async function readStdin() {

@@ -1144,7 +1144,7 @@ document.addEventListener("click", (event) => {
     }
     void api(`/repos/${state.repoId}/gate/install`, { method: "POST", body: "{}" })
       .then(() => {
-        showNotice("门禁已写入这个仓库。请新开一个 Agent 对话，放行前的写文件才会被拦住。");
+        showNotice("门禁已装到本机 Cursor 智能体。之后任意项目里的 Agent 写文件都会先过这道门。请新开一个对话后生效。");
       })
       .catch(showError);
     return;
