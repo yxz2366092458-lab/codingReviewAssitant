@@ -1,0 +1,44 @@
+apps/web/index.html
+  s_154e81a2e32661::t_c419fec81e1bd6 7
+  s_154e81a2e32661::t_f3766540501d0f 83
+  s_154e81a2e32661::t_8e62232d9cb099 28-31
+apps/daemon/src/gate/policy.ts
+  s_154e81a2e32661::t_79a4997ae1a87a 45,53
+apps/daemon/src/gate/machine.ts
+  s_154e81a2e32661::t_b9f68eacbe1940 15
+  s_154e81a2e32661::t_218896b32703b4 159
+test/bugfix.test.ts
+  s_154e81a2e32661::t_d7218a70af9419 1-73
+apps/web/app.css
+  s_154e81a2e32661::t_b03753cfae9f71 65-73
+apps/cli/review-gate.ts
+  s_154e81a2e32661::t_82eba870751fce 74-84
+  s_154e81a2e32661::t_4f2462163555f5 99
+apps/web/app.js
+  s_154e81a2e32661::t_189f12b4672959 234
+  s_154e81a2e32661::t_fae30ae4f93d4a 264
+  s_154e81a2e32661::t_edba2a37454fae 39
+  s_154e81a2e32661::t_ae406c63090771 276-298,300-308
+  s_154e81a2e32661::t_3c9187fc96e2aa 73
+apps/daemon/src/gate/bugfix.ts
+  s_154e81a2e32661::t_5afc849d6f0829 1-31
+apps/daemon/src/server.ts
+  s_154e81a2e32661::t_d5bc4a53213783 7
+  s_154e81a2e32661::t_3cc8c40cec17cb 270-283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "45b2fc107a747380053f08ee3332fb191254998a",
+  "prompts": {},
+  "sessions": {
+    "s_154e81a2e32661": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "24d412a8-2171-42d5-8e8f-d4fc825b1692",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
