@@ -62,6 +62,15 @@ button.decision { min-width: 96px; }
   padding: 4px 12px;
   max-width: 240px;
 }
+.bugfix-entry { display: flex; gap: 8px; align-items: center; }
+.bugfix-entry input {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+  width: 220px;
+}
 .work-branches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .work-branches strong {
   font-weight: 650;

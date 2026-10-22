@@ -36,6 +36,7 @@ const labels = {
 };
 
 function gateLabel(gate) {
+  if (gate.bugfix) return "bugfix";
   if (gate.lease === "revert") return "待撤回";
   if (gate.phase === "requirement" && gate.state === "awaiting_release") return "待需求准入";
   if (gate.phase === "development" && gate.state === "awaiting_release") return "待开发";
@@ -69,6 +70,7 @@ async function bootRepo() {
   });
   $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
+  $("bugfix-entry").addEventListener("submit", (event) => void submitBugfix(event).catch(showError));
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -229,6 +231,7 @@ async function loadPanel() {
     purpose: gate.slice?.purpose,
     finalRound: gate.finalRound,
     phase: gate.phase,
+    bugfix: gate.bugfix ?? "",
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
@@ -258,6 +261,7 @@ async function loadPanel() {
   });
   state.files = diff.files ?? [];
   renderSummary(gate);
+  renderBugfix(gate);
   renderFiles(diff.files ?? []);
   renderHistory(slices);
   if (!state.fileId && diff.files?.[0]) state.fileId = diff.files[0].fileId;
@@ -269,7 +273,39 @@ async function loadPanel() {
   }
 }
 
+function renderBugfix(gate) {
+  const input = $("bugfix-purpose");
+  const button = $("bugfix-open");
+  const open = Boolean(gate.bugfix);
+  button.dataset.mode = open ? "close" : "open";
+  button.textContent = open ? "恢复门禁" : "跳过门禁";
+  if (document.activeElement === input) return;
+  input.value = gate.bugfix || "";
+}
+
+async function submitBugfix(event) {
+  event.preventDefault();
+  const closing = $("bugfix-open").dataset.mode === "close";
+  const purpose = closing ? "" : $("bugfix-purpose").value.trim();
+  if (!closing && !purpose) return;
+  await api(`/repos/${state.repoId}/gate/bugfix`, {
+    method: "POST",
+    body: JSON.stringify({ purpose }),
+  });
+  $("bugfix-purpose").blur();
+  await refresh();
+}
+
 function renderSummary(gate) {
+  if (gate.bugfix) {
+    $("meta").textContent = "门禁已跳过";
+    $("purpose").textContent = gate.bugfix;
+    $("round-label").hidden = true;
+    $("phase-label").hidden = true;
+    $("decision-wrap").hidden = true;
+    $("banner").hidden = true;
+    return;
+  }
   const slice = gate.slice;
   $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
   $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";

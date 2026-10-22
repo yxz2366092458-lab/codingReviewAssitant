@@ -71,6 +71,17 @@ if (command === "wait") {
   process.exit(view.state === "editing" ? 0 : 1);
 }
 
+if (command === "bugfix") {
+  const purpose = rest.join(" ").trim();
+  if (!purpose) {
+    process.stderr.write("用法：review-gate bugfix \"需求\" | bugfix off\n");
+    process.exit(1);
+  }
+  const view = await call("POST", `/repos/${await repoId()}/gate/bugfix`, { purpose: purpose === "off" ? "" : purpose });
+  process.stdout.write(view.bugfix ? `${view.bugfix}\n` : "已恢复门禁\n");
+  process.exit(0);
+}
+
 if (command === "complete") {
   const view = await call("POST", `/repos/${await repoId()}/gate/complete`, {});
   process.stdout.write(`${view.state}\n`);
@@ -85,7 +96,7 @@ if (command === "complete") {
   process.exit(1);
 }
 
-process.stderr.write("用法：review-gate start \"需求名\" | intend \"作用\" [--final] | wait | complete | check-tool\n");
+process.stderr.write("用法：review-gate start \"需求名\" | intend \"作用\" [--final] | wait | complete | bugfix \"需求\" | bugfix off | check-tool\n");
 process.exit(1);
 
 async function repoId(path) {

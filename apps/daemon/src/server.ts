@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { join, resolve } from "node:path";
 import { VERSION } from "../../../packages/protocol/src/index.ts";
 import { installGate } from "./adapters/install.ts";
+import { closeBugfix, openBugfix, readBugfix } from "./gate/bugfix.ts";
 import { acknowledge, checkCall, complete, GateError, gateView, intend, reject, release, syncRepo } from "./gate/machine.ts";
 import {
   detectBaseRef,
@@ -266,7 +267,20 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       if (view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
         admitSession(db, repo.id, head, view.slice.sliceId);
       }
-      sendJson(res, 200, { ...present(view), phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null) });
+      sendJson(res, 200, {
+        ...present(view),
+        phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null),
+        bugfix: readBugfix(db, repo.id),
+      });
+      return;
+    }
+    if (req.method === "POST" && rest === "gate/bugfix") {
+      const body = await readJson(req);
+      const purpose = String(body.purpose ?? "").trim();
+      if (!purpose) closeBugfix(db, repo.id);
+      else openBugfix(db, repo.id, purpose);
+      publish(repo.id);
+      sendJson(res, 200, { bugfix: readBugfix(db, repo.id) });
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {

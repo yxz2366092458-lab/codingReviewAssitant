@@ -42,7 +42,7 @@ export function normalizeToolCall(raw: Record<string, unknown>): ToolCall {
   return { tool, command, paths: [...paths], agent: String(raw.agent ?? "cursor") };
 }
 
-export function decide(call: ToolCall, state: GateState, lease: Lease | null): CheckResult {
+export function decide(call: ToolCall, state: GateState, lease: Lease | null, bugfix = false): CheckResult {
   if (isReviewGate(call.command)) return { permission: "allow", message: "" };
   if (call.paths.some(isProtected)) {
     return { permission: "deny", message: "门禁文件只能由面板里的「安装门禁」写入。" };
@@ -50,6 +50,7 @@ export function decide(call: ToolCall, state: GateState, lease: Lease | null): C
 
   const writing = isWrite(call);
   if (!writing) return { permission: "allow", message: "" };
+  if (bugfix) return { permission: "allow", message: "" };
 
   if (state === "editing" && lease === "revert") {
     if (isRevertCommand(call.command)) return { permission: "allow", message: "" };

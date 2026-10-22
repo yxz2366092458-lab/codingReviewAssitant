@@ -12,6 +12,7 @@ import {
   updateSlice,
   type SliceRow,
 } from "../session/store.ts";
+import { readBugfix } from "./bugfix.ts";
 import { decide, normalizeToolCall } from "./policy.ts";
 
 export class GateError extends Error {
@@ -155,7 +156,7 @@ function reviewedFrom(commits: string[], subject: string, purpose: string) {
 export function checkCall(db: DatabaseSync, repoId: string, raw: Record<string, unknown>) {
   const call = normalizeToolCall(raw);
   const view = gateView(db, repoId);
-  const result = decide(call, view.state, view.lease);
+  const result = decide(call, view.state, view.lease, readBugfix(db, repoId) !== null);
   recordAttempt(db, {
     repoId,
     sliceId: view.slice?.sliceId ?? null,
