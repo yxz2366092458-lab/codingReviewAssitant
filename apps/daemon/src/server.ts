@@ -38,6 +38,7 @@ import {
 import { checkoutBranch, listLocalBranches, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
+import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
 import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
@@ -58,7 +59,7 @@ export type RunningServer = {
   close: () => Promise<void>;
 };
 
-export async function startServer(options: { repoPath: string; open?: boolean }): Promise<RunningServer> {
+export async function startServer(options: { repoPath: string; open?: boolean; discoverWorkspaces?: boolean }): Promise<RunningServer> {
   const db = openStore();
   await pinOpenSlices(db);
   const token = randomBytes(32).toString("hex");
@@ -67,6 +68,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   const clients = new Set<SocketClient>();
   let fingerprint = "";
   let stopped = false;
+  let discovering = false;
+  let discovery: ReturnType<typeof setInterval> | null = null;
 
   const server = createServer(async (req, res) => {
     try {
@@ -112,6 +115,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   const cursorProxy = await startCursorProxy({ repoPath });
   useCursorProxy({ url: cursorProxy.url, token: cursorProxy.token });
+  await discoverCursorRepos();
+  if (options.discoverWorkspaces) discovery = setInterval(() => void discoverCursorRepos(), 8000);
 
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   const address = server.address();
@@ -119,6 +124,31 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   writeDaemonInfo({ pid: process.pid, port, token });
   const url = `http://127.0.0.1:${port}/`;
   if (options.open) openPanel(url);
+
+  async function discoverCursorRepos(): Promise<void> {
+    if (!options.discoverWorkspaces || stopped || discovering) return;
+    discovering = true;
+    try {
+      const folders = readRecentFolderPaths(cursorRecentStatePath());
+      for (const folder of folders) {
+        if (stopped) return;
+        let top = "";
+        try {
+          top = await topLevel(folder);
+        } catch {
+          continue;
+        }
+        if (stopped || findRepoByPath(db, top)) continue;
+        const registered = await registerRepo(top);
+        if (stopped) return;
+        publish(registered.repoId, registered.branch);
+      }
+    } catch {
+      return;
+    } finally {
+      discovering = false;
+    }
+  }
 
   async function onRepoChange(): Promise<void> {
     if (stopped) return;
@@ -658,6 +688,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     close: () =>
       new Promise((resolveClose) => {
         stopped = true;
+        if (discovery) clearInterval(discovery);
         watcher.close();
         useCursorProxy(null);
         void cursorProxy.close().finally(() => {

@@ -217,7 +217,22 @@ async function refresh() {
   }
 }
 
+async function syncRepoList() {
+  const repos = await api("/repos");
+  const same =
+    repos.length === state.repos.length &&
+    repos.every((repo, index) => repo.id === state.repos[index]?.id && repo.path === state.repos[index]?.path);
+  if (same) return;
+  state.repos = repos;
+  if (!repos.some((repo) => repo.id === state.repoId) && repos[0]) {
+    state.repoId = repos[0].id;
+    resetView();
+  }
+  renderRepoSelect();
+}
+
 async function loadPanel() {
+  await syncRepoList();
   const gatePath = state.viewBranch
     ? `/repos/${state.repoId}/gate?branch=${encodeURIComponent(state.viewBranch)}`
     : `/repos/${state.repoId}/gate`;
