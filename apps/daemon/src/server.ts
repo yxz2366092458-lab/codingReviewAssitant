@@ -268,14 +268,17 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "GET" && rest === "gate") {
       const head = await headBranch(repo.path);
-      const view = gateView(db, repo.id, head);
-      if (view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
+      const asked = url.searchParams.get("branch")?.trim() ?? "";
+      const branch = asked || head;
+      const view = gateView(db, repo.id, branch);
+      if (branch === head && view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
         admitSession(db, repo.id, head, view.slice.sliceId);
       }
       sendJson(res, 200, {
         ...present(view),
-        phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null),
-        mergeTarget: readMergeTarget(db, repo.id, head) || null,
+        phase: sessionPhase(db, repo.id, branch, view.slice?.sliceId ?? null),
+        mergeTarget: readMergeTarget(db, repo.id, branch) || null,
+        branch,
         bugfix: readBugfix(db, repo.id),
       });
       return;
@@ -332,12 +335,14 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "POST" && rest === "gate/release") {
       const body = await readJson(req);
       const head = await headBranch(repo.path);
-      const sliceId = String(body.sliceId ?? "");
-      if (sessionPhase(db, repo.id, head, sliceId) === "requirement" && !readMergeTarget(db, repo.id, head)) {
+      const targetSlice = String(body.sliceId ?? "");
+      const slice = findSlice(db, targetSlice);
+      const branch = slice?.branch || head;
+      if (sessionPhase(db, repo.id, branch, targetSlice) === "requirement" && !readMergeTarget(db, repo.id, branch)) {
         throw new GateError(409, "需求准入前要先绑定合并目标分支。");
       }
-      const released = await release(db, repo.path, sliceId);
-      admitSession(db, repo.id, head, sliceId);
+      const released = await release(db, repo.path, targetSlice);
+      admitSession(db, repo.id, branch, targetSlice);
       publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, released);
       return;
@@ -345,11 +350,13 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     if (req.method === "POST" && rest === "gate/ack") {
       const body = await readJson(req);
       const status = await repoStatus(repo.path, repo.base_ref);
-      await mergeWorkBranches(db, repo.path, repo.id, status.branch);
+      const slice = findSlice(db, String(body.sliceId ?? ""));
+      const branchName = slice?.branch || status.branch;
+      await mergeWorkBranches(db, repo.path, repo.id, branchName);
       const branch = String(body.branch ?? "").trim();
       if (branch) {
         try {
-          await mergeRequirementIntoBranch(db, repo.path, repo.id, status.branch, branch);
+          await mergeRequirementIntoBranch(db, repo.path, repo.id, branchName, branch);
         } catch (error) {
           const message = error instanceof Error ? error.message : "合并失败";
           throw new GateError(409, message);
@@ -515,11 +522,27 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
+  function reviewedSession(repoId: string, sessionId: string | null) {
+    const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
+    if (!pair) return null;
+    return { pair, view: gateView(db, repoId, pair.development) };
+  }
+
   async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null) {
     try {
       if (scope === "session") {
-        const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
-        return pair ? await listRange(cwd, pair.requirement, pair.development) : [];
+        const review = reviewedSession(repoId, sessionId);
+        if (!review) return [];
+        const slice = review.view.slice;
+        if (review.view.state === "awaiting_release") return [];
+        if (slice?.commitSha) {
+          const parent = await parentOf(cwd, slice.commitSha);
+          return parent ? await listCommit(cwd, parent, slice.commitSha) : [];
+        }
+        if (review.view.state === "editing" && review.pair.development === await headBranch(cwd)) {
+          return await listWorktree(cwd);
+        }
+        return await listRange(cwd, review.pair.requirement, review.pair.development);
       }
       if (scope === "branch") {
         const pair = readWorkBranches(db, repoId, await headBranch(cwd));
@@ -541,8 +564,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null): Promise<string[]> {
     if (scope === "session") {
-      const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
-      return pair ? [`${pair.requirement}...${pair.development}`] : ["HEAD"];
+      const review = reviewedSession(repoId, sessionId);
+      if (!review) return ["HEAD"];
+      const slice = review.view.slice;
+      if (slice?.commitSha) {
+        const parent = await parentOf(cwd, slice.commitSha);
+        if (parent) return [parent, slice.commitSha];
+      }
+      if (review.view.state === "editing" && review.pair.development === await headBranch(cwd)) return ["HEAD"];
+      return [`${review.pair.requirement}...${review.pair.development}`];
     }
     if (scope === "branch") {
       const pair = readWorkBranches(db, repoId, await headBranch(cwd));

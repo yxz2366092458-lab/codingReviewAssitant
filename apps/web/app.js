@@ -20,6 +20,7 @@ const state = {
   pendingExplain: {},
   drafts: {},
   viewSession: "",
+  viewBranch: "",
   loadedExplainSession: "",
   sessions: [],
 };
@@ -167,6 +168,7 @@ function resetView() {
   state.pendingExplain = {};
   state.drafts = {};
   state.viewSession = "";
+  state.viewBranch = "";
   state.loadedExplainSession = "";
   state.sessions = [];
   $("source").hidden = true;
@@ -216,9 +218,12 @@ async function refresh() {
 }
 
 async function loadPanel() {
+  const gatePath = state.viewBranch
+    ? `/repos/${state.repoId}/gate?branch=${encodeURIComponent(state.viewBranch)}`
+    : `/repos/${state.repoId}/gate`;
   const [status, gate, diff, slices, sessionPage] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
-    api(`/repos/${state.repoId}/gate`),
+    api(gatePath),
     api(`/repos/${state.repoId}/diff?${diffQuery()}`),
     api(`/repos/${state.repoId}/slices?page=${state.historyPage}`),
     api(`/repos/${state.repoId}/sessions`),
@@ -256,7 +261,7 @@ async function loadPanel() {
   state.signature = signature;
   renderSessions(active);
   renderWorkBranches(shownBranches(status));
-  $("merge-target").textContent = status.mergeTarget || "未绑定";
+  $("merge-target").textContent = (state.viewBranch ? gate.mergeTarget : status.mergeTarget) || "未绑定";
   $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
@@ -1099,6 +1104,7 @@ function emptyDiffText(gate) {
 
 function openSession(item) {
   state.viewSession = item.current ? "" : item.sessionId;
+  state.viewBranch = item.current ? "" : item.development;
   state.scope = item.current ? "slice" : "session";
   state.sliceId = "";
   state.fileId = "";
@@ -1132,6 +1138,7 @@ function renderHistory(page) {
       state.sliceId = slice.sliceId;
       state.scope = "slice";
       state.viewSession = "";
+      state.viewBranch = "";
       state.fileId = "";
       state.signature = "";
       void refresh().catch(showError);
@@ -1191,6 +1198,7 @@ document.addEventListener("click", (event) => {
     state.sliceId = "";
     state.fileId = "";
     state.viewSession = "";
+    state.viewBranch = "";
     state.picked = [];
     state.signature = "";
     void refresh().catch(showError);
