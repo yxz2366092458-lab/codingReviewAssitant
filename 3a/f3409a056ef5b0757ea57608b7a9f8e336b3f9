@@ -1,0 +1,39 @@
+apps/web/app.js
+  s_0212268cbfb773::t_c55ddad284d1b2 1141
+  s_0212268cbfb773::t_5cfd265d00c8bc 1107
+  s_0212268cbfb773::t_37bb922e65ae15 264
+  s_0212268cbfb773::t_dd405ef8e2b80a 1201
+  s_0212268cbfb773::t_3ebd222deab044 221-223,226
+  s_0212268cbfb773::t_fe7ac0c6e3dd94 23
+  s_0212268cbfb773::t_56a2dc51a28c40 171
+test/session-review.test.ts
+  s_0212268cbfb773::t_2a427ea24c43ad 1-68
+apps/daemon/src/server.ts
+  s_0212268cbfb773::t_3871cc8d88b85e 271-274,279-281
+  s_0212268cbfb773::t_d0fa9c69e81785 359
+  s_0212268cbfb773::t_91d43752f31cb6 353-355
+  s_0212268cbfb773::t_06f871b6b5d5a3 338-339,341,344-345
+  s_0212268cbfb773::t_28a4a6b26c50b2 567-575
+  s_0212268cbfb773::t_64a885eb2f0434 534-545
+  s_0212268cbfb773::t_d73716bad3b99f 525-530
+  s_0212268cbfb773::t_b4d8f96b9f7553 340
+apps/web/index.html
+  s_0212268cbfb773::t_55311529739aa5 7
+  s_0212268cbfb773::t_f7c3e5e1e40155 85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3af3409a056ef5b0757ea57608b7a9f8e336b3f9",
+  "prompts": {},
+  "sessions": {
+    "s_0212268cbfb773": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dbb71e0e-5097-41d1-9c33-1f71cdd095a3",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
