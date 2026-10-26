@@ -39,7 +39,7 @@ import { checkoutBranch, listLocalBranches, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
-import { admitSession, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
+import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -227,6 +227,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         baseRef: repo.base_ref,
         requirement: pair?.requirement ?? null,
         development: pair?.development ?? null,
+        mergeTarget: readMergeTarget(db, repo.id, status.branch) || null,
         gate: view.state,
         lease: view.lease,
       });
@@ -274,6 +275,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       sendJson(res, 200, {
         ...present(view),
         phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null),
+        mergeTarget: readMergeTarget(db, repo.id, head) || null,
         bugfix: readBugfix(db, repo.id),
       });
       return;
@@ -314,10 +316,28 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       await settleFor(req, res, sliceId);
       return;
     }
+    if (req.method === "POST" && rest === "gate/target") {
+      const body = await readJson(req);
+      const head = await headBranch(repo.path);
+      try {
+        const mergeTarget = await bindMergeTarget(db, repo.path, repo.id, head, String(body.branch ?? ""));
+        publish(repo.id, head);
+        sendJson(res, 200, { mergeTarget });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不能绑定合并目标";
+        throw new GateError(409, message);
+      }
+      return;
+    }
     if (req.method === "POST" && rest === "gate/release") {
       const body = await readJson(req);
-      const released = await release(db, repo.path, String(body.sliceId ?? ""));
-      admitSession(db, repo.id, await headBranch(repo.path), String(body.sliceId ?? ""));
+      const head = await headBranch(repo.path);
+      const sliceId = String(body.sliceId ?? "");
+      if (sessionPhase(db, repo.id, head, sliceId) === "requirement" && !readMergeTarget(db, repo.id, head)) {
+        throw new GateError(409, "需求准入前要先绑定合并目标分支。");
+      }
+      const released = await release(db, repo.path, sliceId);
+      admitSession(db, repo.id, head, sliceId);
       publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, released);
       return;

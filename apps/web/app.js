@@ -237,6 +237,7 @@ async function loadPanel() {
     mode: state.mode,
     requirement: status.requirement,
     development: status.development,
+    mergeTarget: status.mergeTarget ?? gate.mergeTarget ?? "",
     historyPage: slices.page,
     history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
     sessions: state.sessions.map((item) => `${item.sessionId}:${item.current}`).join(","),
@@ -255,6 +256,7 @@ async function loadPanel() {
   state.signature = signature;
   renderSessions(active);
   renderWorkBranches(shownBranches(status));
+  $("merge-target").textContent = status.mergeTarget || "未绑定";
   $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
@@ -332,9 +334,17 @@ function renderSummary(gate) {
     decisions.append(select);
     decisions.append(decision("核验通过", () => verify(slice.sliceId, select)));
     void fillBranches(select).catch(showError);
+  } else if (gate.phase === "requirement") {
+    const select = document.createElement("select");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "合并目标";
+    select.append(placeholder);
+    decisions.append(select);
+    decisions.append(decision("需求准入", () => admit(slice.sliceId, select)));
+    void fillBranches(select, gate.mergeTarget || "").catch(showError);
   } else {
-    const primary = gate.phase === "requirement" ? "需求准入" : "放行";
-    decisions.append(decision(primary, () => act("release", slice.sliceId)));
+    decisions.append(decision("放行", () => act("release", slice.sliceId)));
   }
   decisions.append(decision("退回", () => act("reject", slice.sliceId)));
   const banner = $("banner");
@@ -366,7 +376,7 @@ async function act(name, sliceId) {
   await refresh();
 }
 
-async function fillBranches(select) {
+async function fillBranches(select, preferred = "") {
   const { branches } = await api(`/repos/${state.repoId}/branches`);
   if (!select.isConnected) return;
   const chosen = select.value;
@@ -377,6 +387,20 @@ async function fillBranches(select) {
     select.append(option);
   }
   if (branches.includes(chosen)) select.value = chosen;
+  else if (branches.includes(preferred)) select.value = preferred;
+}
+
+async function admit(sliceId, select) {
+  const branch = select.value.trim();
+  if (!branch) {
+    showNotice("需求准入前要先绑定合并目标分支。");
+    return;
+  }
+  await api(`/repos/${state.repoId}/gate/target`, {
+    method: "POST",
+    body: JSON.stringify({ branch }),
+  });
+  await act("release", sliceId);
 }
 
 let verifying = false;

@@ -232,6 +232,32 @@ export function admitSession(db: DatabaseSync, repoId: string, headBranch: strin
   );
 }
 
+export function readMergeTarget(db: DatabaseSync, repoId: string, headBranch: string): string {
+  return readRecord(db, repoId, headBranch)?.merge_target?.trim() ?? "";
+}
+
+export async function bindMergeTarget(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  headBranch: string,
+  target: string,
+): Promise<string> {
+  const name = assertBranchName(target);
+  const row = readRecord(db, repoId, headBranch);
+  if (!row) throw new Error("还没有这条会话的分支");
+  if (row.admitted) throw new Error("需求已经准入，不能再改合并目标");
+  if (name === row.development || name === row.requirement) throw new Error("合并目标不能是这条会话自己的分支");
+  const branches = await listLocalBranches(cwd);
+  if (!branches.includes(name)) throw new Error("没有这个本地分支");
+  db.prepare("UPDATE work_branches SET merge_target = ? WHERE repo_id = ? AND development = ?").run(
+    name,
+    repoId,
+    row.development,
+  );
+  return name;
+}
+
 export async function repairSessionRequirements(
   db: DatabaseSync,
   cwd: string,
@@ -286,12 +312,13 @@ async function availableRequirement(db: DatabaseSync, cwd: string, repoId: strin
 function readRecord(db: DatabaseSync, repoId: string, headBranch: string) {
   ensureWorkBranches(db);
   const rows = db.prepare(
-    "SELECT requirement, development, admitted, requirement_slice FROM work_branches WHERE repo_id = ?",
+    "SELECT requirement, development, admitted, requirement_slice, merge_target FROM work_branches WHERE repo_id = ?",
   ).all(repoId) as Array<{
     requirement: string;
     development: string;
     admitted: number;
     requirement_slice: string | null;
+    merge_target: string | null;
   }>;
   if (!rows.length) return null;
   if (headBranch) {
@@ -310,6 +337,7 @@ function ensureWorkBranches(db: DatabaseSync): void {
       development TEXT NOT NULL,
       admitted INTEGER NOT NULL DEFAULT 0,
       requirement_slice TEXT,
+      merge_target TEXT,
       PRIMARY KEY (repo_id, session_id)
     )`);
   };
@@ -335,5 +363,8 @@ function ensureWorkBranches(db: DatabaseSync): void {
   }
   if (!ready.some((column) => column.name === "requirement_slice")) {
     db.exec("ALTER TABLE work_branches ADD COLUMN requirement_slice TEXT");
+  }
+  if (!ready.some((column) => column.name === "merge_target")) {
+    db.exec("ALTER TABLE work_branches ADD COLUMN merge_target TEXT");
   }
 }
