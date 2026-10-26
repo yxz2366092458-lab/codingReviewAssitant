@@ -1,0 +1,38 @@
+apps/web/index.html
+  s_0212268cbfb773::t_f43dc70977b30c 7
+  s_0212268cbfb773::t_eb93790f626cb6 25-26
+  s_0212268cbfb773::t_008e74bc0a325e 85
+apps/daemon/src/work-branch.ts
+  s_0212268cbfb773::t_7390bbd9fb3caa 340
+  s_0212268cbfb773::t_ac87b768ac62fc 315,321
+  s_0212268cbfb773::t_34fffe4ed9c2b5 235-260
+  s_0212268cbfb773::t_f4652b8b5cc635 367-369
+apps/daemon/src/server.ts
+  s_0212268cbfb773::t_9455059fc136dc 319-331,334-340
+  s_0212268cbfb773::t_e0be530f3d3f6f 230
+  s_0212268cbfb773::t_ae82d21f36c15f 278
+  s_0212268cbfb773::t_f62a2102c3e239 42
+apps/web/app.js
+  s_0212268cbfb773::t_db71fd9f1585d0 379,390-403
+  s_0212268cbfb773::t_ec10c2d166b670 240
+  s_0212268cbfb773::t_6cb5fe2b9fae60 259
+  s_0212268cbfb773::t_821c615d901bfd 337-345,347
+test/merge-target.test.ts
+  s_0212268cbfb773::t_21d6d2b9f5cb0f 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c5ba47ac5c5baf1afb1d77c64b52cccb5455b9d8",
+  "prompts": {},
+  "sessions": {
+    "s_0212268cbfb773": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dbb71e0e-5097-41d1-9c33-1f71cdd095a3",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
