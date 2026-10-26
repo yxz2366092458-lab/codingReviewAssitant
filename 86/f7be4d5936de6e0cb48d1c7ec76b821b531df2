@@ -1,0 +1,56 @@
+apps/daemon/src/session/store.ts
+  s_0212268cbfb773::t_5499f74ff609da 103-106
+  s_0212268cbfb773::t_a739f11451e8b0 45
+  s_0212268cbfb773::t_62cfc55c9293ac 19
+  s_0212268cbfb773::t_0456d281be3750 171-172,178
+  s_0212268cbfb773::t_d2456ab8d49331 156,159,161
+apps/daemon/src/gate/machine.ts
+  s_0212268cbfb773::t_ed6cef6a9c6f84 28-29,34,37-40,47,58-74
+  s_0212268cbfb773::t_36fe4c91394205 10
+  s_0212268cbfb773::t_d0f1449a44919f 87,94
+  s_0212268cbfb773::t_1be7ab1d099e82 192-199
+  s_0212268cbfb773::t_32cec45112b35f 125
+  s_0212268cbfb773::t_e869d2d6997ce0 134,138-139
+  s_0212268cbfb773::t_b032e477a474e0 110,118,122-123
+  s_0212268cbfb773::t_137636e0d7b4d7 177,179
+apps/daemon/src/server.ts
+  s_0212268cbfb773::t_f93f244ed1d395 252-253,256
+  s_0212268cbfb773::t_2d10a6e4a2482a 292-293,295-300,303,305
+  s_0212268cbfb773::t_d15c5062a504a0 511
+  s_0212268cbfb773::t_84c55a7fe47155 241-242,245
+  s_0212268cbfb773::t_d8a9a4e210d805 351-353
+  s_0212268cbfb773::t_26afb3b71313f4 270
+  s_0212268cbfb773::t_af9b9a889d61af 135,141-142
+  s_0212268cbfb773::t_501a9e51d4d33a 357-358
+  s_0212268cbfb773::t_6c8152096e3909 338-340
+  s_0212268cbfb773::t_74ffe59ef5cbbb 63
+  s_0212268cbfb773::t_48162751ae29eb 345-347
+  s_0212268cbfb773::t_d24ed9e1f6b1f1 321-322
+  s_0212268cbfb773::t_09950a988e6ace 534
+  s_0212268cbfb773::t_3ce7c030043760 459
+  s_0212268cbfb773::t_43752406da3c29 8
+  s_0212268cbfb773::t_1536b05f78d26e 286
+  s_0212268cbfb773::t_0f09623e0504a7 26
+  s_0212268cbfb773::t_9f42c9d607ed6c 552,554,557-561,563-564,568-569
+  s_0212268cbfb773::t_e452b66575bb34 222
+test/complete-count.test.ts
+  s_0212268cbfb773::t_1c8d0155796155 39
+test/branch-gate.test.ts
+  s_0212268cbfb773::t_e04e31aac4696b 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "86f7be4d5936de6e0cb48d1c7ec76b821b531df2",
+  "prompts": {},
+  "sessions": {
+    "s_0212268cbfb773": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dbb71e0e-5097-41d1-9c33-1f71cdd095a3",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
