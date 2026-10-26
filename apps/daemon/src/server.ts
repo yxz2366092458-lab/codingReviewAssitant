@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { VERSION } from "../../../packages/protocol/src/index.ts";
 import { installGate } from "./adapters/install.ts";
 import { closeBugfix, openBugfix, readBugfix } from "./gate/bugfix.ts";
-import { acknowledge, checkCall, complete, GateError, gateView, intend, reject, release, syncRepo } from "./gate/machine.ts";
+import { acknowledge, checkCall, complete, GateError, gateView, intend, pinOpenSlices, reject, release, syncRepo } from "./gate/machine.ts";
 import {
   detectBaseRef,
   fileIdFor,
@@ -23,6 +23,7 @@ import { watchRepo } from "./git/watcher.ts";
 import {
   findRepo,
   findRepoByPath,
+  activeSlice,
   findSlice,
   insertRepo,
   countSlices,
@@ -59,6 +60,7 @@ export type RunningServer = {
 
 export async function startServer(options: { repoPath: string; open?: boolean }): Promise<RunningServer> {
   const db = openStore();
+  await pinOpenSlices(db);
   const token = randomBytes(32).toString("hex");
   const repoPath = await topLevel(resolve(options.repoPath));
   await beginOnRelease();
@@ -130,14 +132,14 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const next = `${status.head}:${porcelain}`;
       if (!changed && next === fingerprint) return;
       fingerprint = next;
-      publish(repo.id);
+      publish(repo.id, status.branch);
     } catch {
       return;
     }
   }
 
-  function publish(repoId: string): void {
-    const view = gateView(db, repoId);
+  function publish(repoId: string, branch: string): void {
+    const view = gateView(db, repoId, branch);
     const payload = JSON.stringify({
       type: "gate.updated",
       repoId,
@@ -217,7 +219,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
-      const view = gateView(db, repo.id);
+      const view = gateView(db, repo.id, status.branch);
       await repairSessionRequirements(db, repo.path, repo.id);
       const pair = readWorkBranches(db, repo.id, status.branch);
       sendJson(res, 200, {
@@ -236,20 +238,22 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (req.method === "POST" && rest === "branch") {
       const body = await readJson(req);
-      const view = gateView(db, repo.id);
+      const head = await headBranch(repo.path);
+      const view = gateView(db, repo.id, head);
       if (view.state !== "locked") throw new GateError(409, "评审进行中，不能切换分支");
       await checkoutBranch(repo.path, String(body.branch ?? ""));
-      publish(repo.id);
+      publish(repo.id, await headBranch(repo.path));
       const status = await repoStatus(repo.path, repo.base_ref);
       sendJson(res, 200, { branch: status.branch });
       return;
     }
     if (req.method === "POST" && rest === "work-branches") {
       const body = await readJson(req);
-      const view = gateView(db, repo.id);
+      const head = await headBranch(repo.path);
+      const view = gateView(db, repo.id, head);
       if (view.state !== "locked") throw new GateError(409, "评审进行中，不能建立分支");
       const pair = await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, repo.base_ref), String(body.name ?? ""));
-      publish(repo.id);
+      publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, pair);
       return;
     }
@@ -262,8 +266,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "gate") {
-      const view = gateView(db, repo.id);
       const head = await headBranch(repo.path);
+      const view = gateView(db, repo.id, head);
       if (view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
         admitSession(db, repo.id, head, view.slice.sliceId);
       }
@@ -279,23 +283,26 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const purpose = String(body.purpose ?? "").trim();
       if (!purpose) closeBugfix(db, repo.id);
       else openBugfix(db, repo.id, purpose);
-      publish(repo.id);
+      publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, { bugfix: readBugfix(db, repo.id) });
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {
       const body = await readJson(req);
-      if (!gateView(db, repo.id).slice) {
+      let head = await headBranch(repo.path);
+      if (!gateView(db, repo.id, head).slice) {
         const session = String(body.session ?? "").trim();
-        if (!session) throw new GateError(400, "没有会话，不能建立分支");
-        if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
-          throw new GateError(400, "没有会话总结");
+        if (session) {
+          if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
+            throw new GateError(400, "没有会话总结");
+          }
+          await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
+          head = await headBranch(repo.path);
         }
-        await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
       }
-      const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
+      const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""), head);
       if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
-      publish(repo.id);
+      publish(repo.id, head);
       sendJson(res, 200, present(view));
       return;
     }
@@ -311,8 +318,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const body = await readJson(req);
       const released = await release(db, repo.path, String(body.sliceId ?? ""));
       admitSession(db, repo.id, await headBranch(repo.path), String(body.sliceId ?? ""));
-      publishAfter(repo.id, released);
-      sendJson(res, 200, gateView(db, repo.id));
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, released);
       return;
     }
     if (req.method === "POST" && rest === "gate/ack") {
@@ -328,26 +335,27 @@ export async function startServer(options: { repoPath: string; open?: boolean })
           throw new GateError(409, message);
         }
       }
-      acknowledge(db, String(body.sliceId ?? ""));
-      publish(repo.id);
-      sendJson(res, 200, gateView(db, repo.id));
+      const view = acknowledge(db, String(body.sliceId ?? ""));
+      publish(repo.id, status.branch);
+      sendJson(res, 200, view);
       return;
     }
     if (req.method === "POST" && rest === "gate/reject") {
       const body = await readJson(req);
-      await reject(db, repo.path, String(body.sliceId ?? ""), String(body.reason ?? ""));
-      publish(repo.id);
-      sendJson(res, 200, gateView(db, repo.id));
+      const view = await reject(db, repo.path, String(body.sliceId ?? ""), String(body.reason ?? ""));
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, view);
       return;
     }
     if (req.method === "POST" && rest === "gate/complete") {
-      await complete(db, repo.path, repo.id);
-      publish(repo.id);
-      sendJson(res, 200, present(gateView(db, repo.id)));
+      const view = await complete(db, repo.path, repo.id);
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, present(view));
       return;
     }
     if (req.method === "POST" && rest === "gate/check") {
-      sendJson(res, 200, checkCall(db, repo.id, await readJson(req)));
+      const body = await readJson(req);
+      sendJson(res, 200, checkCall(db, repo.id, body, await headBranch(repo.path)));
       return;
     }
     if (req.method === "POST" && rest === "gate/install") {
@@ -446,9 +454,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     const next = await branchBase(repoPath, registered.baseRef);
     if (next !== "release") return;
     if (registered.baseRef !== "release") setBaseRef(db, registered.repoId, "release");
-    if (gateView(db, registered.repoId).state !== "locked") return;
     try {
       const current = (await git(repoPath, ["symbolic-ref", "--short", "HEAD"])).trim();
+      if (gateView(db, registered.repoId, current).state !== "locked") return;
       if (current !== "release") await checkoutBranch(repoPath, "release");
     } catch {
       return;
@@ -500,7 +508,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       }
       if (scope === "staged") return await listStaged(cwd);
       if (scope === "unstaged") return await listUnstaged(cwd);
-      const commit = commitFor(repoId, sliceId);
+      const commit = commitFor(repoId, sliceId, await headBranch(cwd));
       if (commit) {
         const parent = await parentOf(cwd, commit);
         return parent ? await listCommit(cwd, parent, commit) : [];
@@ -523,7 +531,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (scope === "staged") return ["--cached"];
     if (scope === "unstaged") return [];
-    const commit = commitFor(repoId, sliceId);
+    const commit = commitFor(repoId, sliceId, await headBranch(cwd));
     if (commit) {
       const parent = await parentOf(cwd, commit);
       if (parent) return [parent, commit];
@@ -541,25 +549,24 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
-  function commitFor(repoId: string, sliceId: string | null): string | null {
+  function commitFor(repoId: string, sliceId: string | null, branch: string): string | null {
     if (sliceId) return findSlice(db, sliceId)?.commit_sha ?? null;
-    return gateView(db, repoId).slice?.commitSha ?? null;
+    return gateView(db, repoId, branch).slice?.commitSha ?? null;
   }
 
-  function publishAfter(repoId: string, _view: unknown): void {
-    publish(repoId);
-  }
-
-  function waitFor(req: IncomingMessage, res: ServerResponse, repoId: string, sliceId: string | null): Promise<void> {
-    const current = sliceId ? findSlice(db, sliceId) : null;
+  async function waitFor(req: IncomingMessage, res: ServerResponse, repoId: string, sliceId: string | null): Promise<void> {
+    const repo = findRepo(db, repoId);
+    const head = repo ? await headBranch(repo.path) : "";
+    const branchOf = (row: { branch?: string } | null | undefined) => row?.branch || head;
+    const current = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
     if (current && (current.state === "editing" || current.state === "rejected")) {
-      sendJson(res, 200, gateView(db, repoId));
-      return Promise.resolve();
+      sendJson(res, 200, gateView(db, repoId, branchOf(current)));
+      return;
     }
     return new Promise((done) => {
       const timer = setInterval(() => {
-        const row = sliceId ? findSlice(db, sliceId) : null;
-        const view = gateView(db, repoId);
+        const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+        const view = gateView(db, repoId, branchOf(row));
         const finished = row?.state === "editing" || row?.state === "rejected" || (view.state === "editing" && (!sliceId || view.slice?.sliceId === sliceId));
         if (!finished) return;
         clearInterval(timer);
