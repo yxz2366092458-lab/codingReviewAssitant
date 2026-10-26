@@ -1,0 +1,32 @@
+test/cursor-workspaces.test.ts
+  s_d7324d439abb15::t_f3a4d34105dadf 1-76
+apps/daemon/src/index.ts
+  s_d7324d439abb15::t_42342552e7304f 19
+apps/web/app.js
+  s_d7324d439abb15::t_cef59a04cbeecc 220-233,235
+apps/daemon/src/server.ts
+  s_d7324d439abb15::t_85f1ade65aa4fc 118-119
+  s_d7324d439abb15::t_9303cda7cded3b 691
+  s_d7324d439abb15::t_a0524dc3ef6df8 41
+  s_d7324d439abb15::t_dc9e166d2033b6 62
+  s_d7324d439abb15::t_c2542f05ead6df 71-72
+  s_d7324d439abb15::t_9fd89209ab60e1 128-152
+apps/daemon/src/cursor-workspaces.ts
+  s_d7324d439abb15::t_8cecc7aa393841 1-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b539eadbf232fc3e603e3540947e7b8f9ddbec01",
+  "prompts": {},
+  "sessions": {
+    "s_d7324d439abb15": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "64674271-58c1-4a1c-b92a-5d3bdba6f498",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
