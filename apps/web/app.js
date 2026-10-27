@@ -268,10 +268,15 @@ async function loadPanel() {
   });
   if (signature === state.signature) return;
   if (active !== state.loadedExplainSession) {
-    const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
-    state.explainThreads = thread.threads ?? [];
-    restoreExplainBubbles();
-    state.loadedExplainSession = active;
+    try {
+      const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
+      state.explainThreads = thread.threads ?? [];
+      restoreExplainBubbles();
+      state.loadedExplainSession = active;
+      showNotice("");
+    } catch (error) {
+      showError(error);
+    }
   }
   state.signature = signature;
   renderSessions(active);

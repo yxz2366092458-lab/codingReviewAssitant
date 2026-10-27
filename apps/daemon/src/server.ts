@@ -564,7 +564,6 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
         const review = reviewedSession(repoId, sessionId);
         if (!review) return [];
         const slice = review.view.slice;
-        if (review.view.state === "awaiting_release") return [];
         if (slice?.commitSha) {
           const parent = await parentOf(cwd, slice.commitSha);
           return parent ? await listCommit(cwd, parent, slice.commitSha) : [];
