@@ -1,0 +1,24 @@
+apps/daemon/src/impact.ts
+  s_1af0de82965b7f::t_72088446bd2efd 1-120
+test/impact.test.ts
+  s_1af0de82965b7f::t_4ffa6fb0fd45e7 1-56
+apps/daemon/src/server.ts
+  s_1af0de82965b7f::t_485d36925f292a 49
+  s_1af0de82965b7f::t_80a5018637e39d 440-445
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7b572c5ef6b54f50f84ad7a7da7ccc6c431726c1",
+  "prompts": {},
+  "sessions": {
+    "s_1af0de82965b7f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f8ee3ea8-fceb-4280-9217-62fa11a7dc3e",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
