@@ -46,6 +46,7 @@ import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
 import { readLocalLines } from "./local-file.ts";
 import { findSymbols, readSource } from "./symbols.ts";
+import { loadImpactChain } from "./impact.ts";
 
 type SocketClient = { send: (text: string) => void };
 
@@ -434,6 +435,12 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
         page,
         pageSize: SLICE_PAGE_SIZE,
       });
+      return;
+    }
+    if (req.method === "GET" && rest === "impact") {
+      const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId, sessionQuery);
+      const paths = files.flatMap((file) => file.oldPath ? [file.path, file.oldPath] : [file.path]);
+      sendJson(res, 200, loadImpactChain(repo.path, paths));
       return;
     }
     if (req.method === "GET" && rest === "diff") {
