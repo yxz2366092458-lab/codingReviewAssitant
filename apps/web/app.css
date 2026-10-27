@@ -209,6 +209,8 @@ body.cmd #diff { cursor: pointer; }
 .impact-legend .changed { background: var(--add); box-shadow: inset 0 0 0 1px var(--accent); }
 .impact-legend .affected { background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
 .impact svg { display: block; }
+.impact-module { fill: transparent; stroke: var(--line); }
+.impact-module.changed { stroke: var(--accent); }
 .impact-node { fill: var(--fill); stroke: var(--line); }
 .impact-node.changed { fill: var(--add); stroke: var(--accent); }
 .impact-name { fill: var(--ink); font-size: 13px; }
