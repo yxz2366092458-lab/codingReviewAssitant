@@ -1,0 +1,4811 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "019a624f90fa09c1adbf970809a4da2f7fb0fc20",
+  "generatedAt": "2026-10-27T02:11:02.660Z",
+  "files": {
+    ".cursor/hooks.json": {
+      "filePath": ".cursor/hooks.json",
+      "contentHash": "0e68986a54e7e2e22e5a8b946aef2d993601aee44245b06643b9d2b90a284d44",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": false
+    },
+    ".cursor/hooks/review-gate.sh": {
+      "filePath": ".cursor/hooks/review-gate.sh",
+      "contentHash": "e050c70e7a304da6672af60b9f0f545244b3c28392ee690a1c78ef0a2c3a74c3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 3,
+      "hasStructuralAnalysis": false
+    },
+    ".ua/config.json": {
+      "filePath": ".ua/config.json",
+      "contentHash": "5d2ff006cff22c68edd4776249d562ea8c73915a61c6214eb85933865a9402e7",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 4,
+      "hasStructuralAnalysis": false
+    },
+    "AGENTS.md": {
+      "filePath": "AGENTS.md",
+      "contentHash": "2b6999183a87c89fe851d57f4079afcf1aa2b8c95ff132e14a9a4d30c55bab3c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 10,
+      "hasStructuralAnalysis": false
+    },
+    "CLAUDE.md": {
+      "filePath": "CLAUDE.md",
+      "contentHash": "2b6999183a87c89fe851d57f4079afcf1aa2b8c95ff132e14a9a4d30c55bab3c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 10,
+      "hasStructuralAnalysis": false
+    },
+    "README.md": {
+      "filePath": "README.md",
+      "contentHash": "c6df86183014efe4065dc317815cfb79e04126ef63408a83b6f72f2ae29547c0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 26,
+      "hasStructuralAnalysis": false
+    },
+    "apps/cli/review-gate.ts": {
+      "filePath": "apps/cli/review-gate.ts",
+      "contentHash": "3d6abacad88cb73ce07f4253c2202726361e02953c9f5a6f4dff10971d002155",
+      "functions": [
+        {
+          "name": "repoId",
+          "params": [
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "call",
+          "params": [
+            "method",
+            "path",
+            "body"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "callOptional",
+          "params": [
+            "method",
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "git",
+          "params": [
+            "args",
+            "cwd"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "told",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "readStdin",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync",
+            "existsSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "../daemon/src/gate/policy.ts",
+          "specifiers": [
+            "decide",
+            "normalizeToolCall"
+          ]
+        },
+        {
+          "source": "../daemon/src/hook-target.ts",
+          "specifiers": [
+            "hookProjectDir"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 149,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/adapters/install.ts": {
+      "filePath": "apps/daemon/src/adapters/install.ts",
+      "contentHash": "923a0fdc5e43476ddbd939787933ddc7f3625f2131f937921bb255a7988ea312",
+      "functions": [
+        {
+          "name": "installGate",
+          "params": [
+            "cliPath",
+            "cursorDir"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "mergeHooks",
+          "params": [
+            "file"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "shellQuote",
+          "params": [
+            "value"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "chmodSync",
+            "mkdirSync",
+            "readFileSync",
+            "writeFileSync",
+            "existsSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        }
+      ],
+      "exports": [
+        "installGate"
+      ],
+      "totalLines": 43,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/branches.ts": {
+      "filePath": "apps/daemon/src/branches.ts",
+      "contentHash": "ee82caa0031baea571e7eb78a09a613bd60695a9620f2f495862d4f01d1ff78d",
+      "functions": [
+        {
+          "name": "assertBranchName",
+          "params": [
+            "name"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "startRef",
+          "params": [
+            "branches",
+            "fallback"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "runGit",
+          "params": [
+            "cwd",
+            "args"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "runGitOnce",
+          "params": [
+            "cwd",
+            "args"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "listLocalBranches",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<string[]>",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "checkoutBranch",
+          "params": [
+            "cwd",
+            "name"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "createBranch",
+          "params": [
+            "cwd",
+            "name",
+            "start"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "renameBranch",
+          "params": [
+            "cwd",
+            "from",
+            "to"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "mergeFastForward",
+          "params": [
+            "cwd",
+            "target",
+            "source"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "mergeBranch",
+          "params": [
+            "cwd",
+            "target",
+            "source"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 19
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFile"
+          ]
+        },
+        {
+          "source": "./git/lock.ts",
+          "specifiers": [
+            "enqueueGit",
+            "retryOnIndexLock"
+          ]
+        }
+      ],
+      "exports": [
+        "assertBranchName",
+        "startRef",
+        "listLocalBranches",
+        "checkoutBranch",
+        "createBranch",
+        "renameBranch",
+        "mergeFastForward",
+        "mergeBranch"
+      ],
+      "totalLines": 96,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/cursor-proxy.ts": {
+      "filePath": "apps/daemon/src/cursor-proxy.ts",
+      "contentHash": "d176e7d2c19da9e678fe45b0dd6b12ed718daa487be6f059b8906f521a225bf5",
+      "functions": [
+        {
+          "name": "useCursorProxy",
+          "params": [
+            "target"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "cursorProxyTarget",
+          "params": [],
+          "returnType": "ProxyTarget",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "promptInput",
+          "params": [
+            "body"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "agentArgs",
+          "params": [
+            "repoPath",
+            "prompt"
+          ],
+          "returnType": "string[]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "resolveAgentLaunch",
+          "params": [],
+          "returnType": "{ command: string; prefix: string[] }",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "startCursorProxy",
+          "params": [
+            "options"
+          ],
+          "returnType": "Promise<ProxyTarget & { close: () => Promise<void> }>",
+          "exported": true,
+          "lineCount": 52
+        },
+        {
+          "name": "runCursorAgent",
+          "params": [
+            "repoPath",
+            "prompt"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 36
+        },
+        {
+          "name": "sendJson",
+          "params": [
+            "res",
+            "status",
+            "body"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "readJson",
+          "params": [
+            "req"
+          ],
+          "returnType": "Promise<unknown>",
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "randomBytes"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "spawn"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "existsSync"
+          ]
+        },
+        {
+          "source": "node:http",
+          "specifiers": [
+            "createServer",
+            "IncomingMessage",
+            "ServerResponse"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        }
+      ],
+      "exports": [
+        "useCursorProxy",
+        "cursorProxyTarget",
+        "promptInput",
+        "agentArgs",
+        "resolveAgentLaunch",
+        "startCursorProxy"
+      ],
+      "totalLines": 146,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/cursor-workspaces.ts": {
+      "filePath": "apps/daemon/src/cursor-workspaces.ts",
+      "contentHash": "640a31263c0a79933d769558133ccc8f281de2c273932def7e2436575a4b6e11",
+      "functions": [
+        {
+          "name": "recentFolderPaths",
+          "params": [
+            "entries"
+          ],
+          "returnType": "string[]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "cursorRecentStatePath",
+          "params": [
+            "override"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "readRecentFolderPaths",
+          "params": [
+            "databasePath"
+          ],
+          "returnType": "string[]",
+          "exported": true,
+          "lineCount": 13
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:url",
+          "specifiers": [
+            "fileURLToPath"
+          ]
+        }
+      ],
+      "exports": [
+        "recentFolderPaths",
+        "cursorRecentStatePath",
+        "readRecentFolderPaths"
+      ],
+      "totalLines": 42,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/explain.ts": {
+      "filePath": "apps/daemon/src/explain.ts",
+      "contentHash": "18da6bf80964449227d5a636bb14d82955c5eedd5a49ee465545fc798114edd3",
+      "functions": [
+        {
+          "name": "normalizeLines",
+          "params": [
+            "value"
+          ],
+          "returnType": "CodeLine[]",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "selectionAnchors",
+          "params": [
+            "lines"
+          ],
+          "returnType": "Array<ExplainAnchor & { lines: CodeLine[] }>",
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "anchorFor",
+          "params": [
+            "lines"
+          ],
+          "returnType": "ExplainAnchor | null",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "readAnchor",
+          "params": [
+            "value"
+          ],
+          "returnType": "ExplainAnchor | null",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "userTurn",
+          "params": [
+            "lines",
+            "comment"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "explainPrompt",
+          "params": [
+            "lines",
+            "style"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "sessionPrompt",
+          "params": [
+            "history",
+            "lines",
+            "comment"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "parseCommentAction",
+          "params": [
+            "raw"
+          ],
+          "returnType": "CommentAction",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "applySelectionEdit",
+          "params": [
+            "root",
+            "lines",
+            "code"
+          ],
+          "returnType": "ExplainAnchor",
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "fileInside",
+          "params": [
+            "root",
+            "filePath"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "sameLine",
+          "params": [
+            "fileLine",
+            "sent"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "remember",
+          "params": [
+            "key",
+            "history",
+            "lines",
+            "comment",
+            "reply"
+          ],
+          "returnType": "ExplainTurn[]",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "threadFor",
+          "params": [
+            "key"
+          ],
+          "returnType": "ExplainTurn[]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "resolveExplainSession",
+          "params": [
+            "requested",
+            "known",
+            "current"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "ensureExplainTurns",
+          "params": [
+            "db"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 23
+        },
+        {
+          "name": "loadThread",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "anchor"
+          ],
+          "returnType": "ExplainTurn[]",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "loadThreads",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId"
+          ],
+          "returnType": "ExplainThread[]",
+          "exported": true,
+          "lineCount": 38
+        },
+        {
+          "name": "modeKey",
+          "params": [
+            "anchor"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "ensureExplainModes",
+          "params": [
+            "db"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "loadModeMap",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId"
+          ],
+          "returnType": "Map<string, ExplainModes>",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "loadExplainModes",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "anchor"
+          ],
+          "returnType": "ExplainModes",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "saveExplainMode",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "anchor",
+            "style",
+            "content"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "saveThread",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "anchor",
+            "turns"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "loadTurns",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId"
+          ],
+          "returnType": "ExplainTurn[]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "saveTurns",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "turns"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "explainInSession",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "lines",
+            "comment",
+            "anchor",
+            "root"
+          ],
+          "returnType": "Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor }>",
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "explainSelection",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId",
+            "lines",
+            "style",
+            "anchor"
+          ],
+          "returnType": "Promise<{ reply: string; anchor: ExplainAnchor; mode: ExplainStyle; cached: boolean; modes: ExplainModes }>",
+          "exported": true,
+          "lineCount": 27
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "relative",
+            "resolve",
+            "sep"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "./summary-ai.ts",
+          "specifiers": [
+            "completePrompt"
+          ]
+        }
+      ],
+      "exports": [
+        "normalizeLines",
+        "selectionAnchors",
+        "anchorFor",
+        "readAnchor",
+        "userTurn",
+        "explainPrompt",
+        "sessionPrompt",
+        "parseCommentAction",
+        "applySelectionEdit",
+        "remember",
+        "threadFor",
+        "resolveExplainSession",
+        "loadThread",
+        "loadThreads",
+        "loadExplainModes",
+        "saveExplainMode",
+        "saveThread",
+        "loadTurns",
+        "saveTurns",
+        "explainInSession",
+        "explainSelection"
+      ],
+      "totalLines": 449,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/gate/bugfix.ts": {
+      "filePath": "apps/daemon/src/gate/bugfix.ts",
+      "contentHash": "73aa6c2834cc484d4f7df1c777a31994943a29eba3e15be3de2e4041e7f8a993",
+      "functions": [
+        {
+          "name": "readBugfix",
+          "params": [
+            "db",
+            "repoId"
+          ],
+          "returnType": "string | null",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "openBugfix",
+          "params": [
+            "db",
+            "repoId",
+            "purpose"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "closeBugfix",
+          "params": [
+            "db",
+            "repoId"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "ensureBugfix",
+          "params": [
+            "db"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        }
+      ],
+      "exports": [
+        "readBugfix",
+        "openBugfix",
+        "closeBugfix"
+      ],
+      "totalLines": 32,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/gate/machine.ts": {
+      "filePath": "apps/daemon/src/gate/machine.ts",
+      "contentHash": "a042dfb14ae7cdd003ca8e934972fc80b3e495d12dfd4eb3f1f45402450fdfb3",
+      "functions": [
+        {
+          "name": "gateView",
+          "params": [
+            "db",
+            "repoId",
+            "branch"
+          ],
+          "returnType": "GateView",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "intend",
+          "params": [
+            "db",
+            "repoId",
+            "agent",
+            "purpose",
+            "branch"
+          ],
+          "returnType": "GateView",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "pinOpenSlices",
+          "params": [
+            "db"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "release",
+          "params": [
+            "db",
+            "repoPath",
+            "sliceId"
+          ],
+          "returnType": "Promise<GateView>",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "acknowledge",
+          "params": [
+            "db",
+            "sliceId"
+          ],
+          "returnType": "GateView",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "reject",
+          "params": [
+            "db",
+            "repoPath",
+            "sliceId",
+            "reason"
+          ],
+          "returnType": "Promise<GateView>",
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "complete",
+          "params": [
+            "db",
+            "repoPath",
+            "repoId"
+          ],
+          "returnType": "Promise<GateView>",
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "syncRepo",
+          "params": [
+            "db",
+            "repoPath",
+            "repoId"
+          ],
+          "returnType": "Promise<boolean>",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "settleEdit",
+          "params": [
+            "db",
+            "repoPath",
+            "row"
+          ],
+          "returnType": "Promise<void>",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "reviewedFrom",
+          "params": [
+            "commits",
+            "subject",
+            "purpose"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "checkCall",
+          "params": [
+            "db",
+            "repoId",
+            "raw",
+            "branch"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "checkedOutBranch",
+          "params": [
+            "repoPath"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "need",
+          "params": [
+            "db",
+            "sliceId"
+          ],
+          "returnType": "SliceRow",
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "classes": [
+        {
+          "name": "GateError",
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "status"
+          ],
+          "exported": true,
+          "lineCount": 8
+        }
+      ],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "randomUUID"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "../../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "GateView"
+          ]
+        },
+        {
+          "source": "../git/diff.ts",
+          "specifiers": [
+            "commitsSince",
+            "commitSubject",
+            "parentOf",
+            "repoStatus"
+          ]
+        },
+        {
+          "source": "../git/runner.ts",
+          "specifiers": [
+            "git"
+          ]
+        },
+        {
+          "source": "../session/store.ts",
+          "specifiers": [
+            "activeSlice",
+            "findSlice",
+            "insertSlice",
+            "listRepos",
+            "recordAttempt",
+            "toSlice",
+            "updateSlice",
+            "SliceRow"
+          ]
+        },
+        {
+          "source": "./bugfix.ts",
+          "specifiers": [
+            "readBugfix"
+          ]
+        },
+        {
+          "source": "./policy.ts",
+          "specifiers": [
+            "decide",
+            "normalizeToolCall"
+          ]
+        }
+      ],
+      "exports": [
+        "GateError",
+        "gateView",
+        "intend",
+        "pinOpenSlices",
+        "release",
+        "acknowledge",
+        "reject",
+        "complete",
+        "syncRepo",
+        "checkCall"
+      ],
+      "totalLines": 205,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/gate/policy.ts": {
+      "filePath": "apps/daemon/src/gate/policy.ts",
+      "contentHash": "088cf9196c06a8d3cd238467b416c8d59acd32f2ac9c50ff1d8a61dfe7b0cb05",
+      "functions": [
+        {
+          "name": "normalizeToolCall",
+          "params": [
+            "raw"
+          ],
+          "returnType": "ToolCall",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "decide",
+          "params": [
+            "call",
+            "state",
+            "lease",
+            "bugfix"
+          ],
+          "returnType": "CheckResult",
+          "exported": true,
+          "lineCount": 25
+        },
+        {
+          "name": "isReviewGate",
+          "params": [
+            "command"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "isProtected",
+          "params": [
+            "filePath"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "isWrite",
+          "params": [
+            "call"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "isRevertCommand",
+          "params": [
+            "command"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "../../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "CheckResult",
+            "GateState",
+            "Lease"
+          ]
+        }
+      ],
+      "exports": [
+        "normalizeToolCall",
+        "decide"
+      ],
+      "totalLines": 96,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/git/diff.ts": {
+      "filePath": "apps/daemon/src/git/diff.ts",
+      "contentHash": "62559c05d58d13b112f7f175b38cf1149c8ea04c44c63bd84948a4db7b9f9c07",
+      "functions": [
+        {
+          "name": "fileIdFor",
+          "params": [
+            "filePath"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "parseNameStatus",
+          "params": [
+            "text"
+          ],
+          "returnType": "StatusInfo[]",
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "parseNumstat",
+          "params": [
+            "text"
+          ],
+          "returnType": "Map<string, { additions: number; deletions: number; binary: boolean }>",
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "parseUnified",
+          "params": [
+            "text"
+          ],
+          "returnType": "DiffHunk[]",
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "listRaw",
+          "params": [
+            "cwd",
+            "diffArgs"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "listUnstaged",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listStaged",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listWorktree",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listRange",
+          "params": [
+            "cwd",
+            "from",
+            "to"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listCommit",
+          "params": [
+            "cwd",
+            "parent",
+            "commit"
+          ],
+          "returnType": "Promise<FileChange[]>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "patchRange",
+          "params": [
+            "cwd",
+            "diffArgs",
+            "filePath"
+          ],
+          "returnType": "Promise<{ hunks: DiffHunk[]; truncated: boolean }>",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "patchHash",
+          "params": [
+            "body"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "detectBaseRef",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "currentBranch",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "existsRef",
+          "params": [
+            "cwd",
+            "ref"
+          ],
+          "returnType": "Promise<boolean>",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "repoStatus",
+          "params": [
+            "cwd",
+            "baseRef"
+          ],
+          "returnType": "Promise<{\n  branch: string;\n  head: string;\n  baseSha: string | null;\n  dirty: boolean;\n}>",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "commitSubject",
+          "params": [
+            "cwd"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "commitsSince",
+          "params": [
+            "cwd",
+            "baseSha"
+          ],
+          "returnType": "Promise<string[]>",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "parentOf",
+          "params": [
+            "cwd",
+            "sha"
+          ],
+          "returnType": "Promise<string | null>",
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "createHash"
+          ]
+        },
+        {
+          "source": "../../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "DiffHunk",
+            "DiffLine",
+            "FileChange",
+            "FileStatus"
+          ]
+        },
+        {
+          "source": "./runner.ts",
+          "specifiers": [
+            "git"
+          ]
+        }
+      ],
+      "exports": [
+        "fileIdFor",
+        "parseNameStatus",
+        "parseNumstat",
+        "parseUnified",
+        "listUnstaged",
+        "listStaged",
+        "listWorktree",
+        "listRange",
+        "listCommit",
+        "patchRange",
+        "patchHash",
+        "detectBaseRef",
+        "currentBranch",
+        "repoStatus",
+        "commitSubject",
+        "commitsSince",
+        "parentOf"
+      ],
+      "totalLines": 199,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/git/lock.ts": {
+      "filePath": "apps/daemon/src/git/lock.ts",
+      "contentHash": "1bf4407e1f0347d8c214d9d76fc6daadd0e63ac50bbda661bc88098e2a94e237",
+      "functions": [
+        {
+          "name": "enqueueGit",
+          "params": [
+            "task"
+          ],
+          "returnType": "Promise<T>",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "retryOnIndexLock",
+          "params": [
+            "task",
+            "attempts",
+            "delayMs"
+          ],
+          "returnType": "Promise<T>",
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "enqueueGit",
+        "retryOnIndexLock"
+      ],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/git/runner.ts": {
+      "filePath": "apps/daemon/src/git/runner.ts",
+      "contentHash": "b02375d835c2620ba51a9011a45518e145eea3f6934342abc102788141fcf686",
+      "functions": [
+        {
+          "name": "git",
+          "params": [
+            "cwd",
+            "args",
+            "timeout"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "gitOk",
+          "params": [
+            "cwd",
+            "args"
+          ],
+          "returnType": "Promise<boolean>",
+          "exported": true,
+          "lineCount": 8
+        }
+      ],
+      "classes": [
+        {
+          "name": "GitError",
+          "methods": [
+            "constructor"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "imports": [
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFile"
+          ]
+        },
+        {
+          "source": "./lock.ts",
+          "specifiers": [
+            "enqueueGit"
+          ]
+        }
+      ],
+      "exports": [
+        "GitError",
+        "git",
+        "gitOk"
+      ],
+      "totalLines": 50,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/git/watcher.ts": {
+      "filePath": "apps/daemon/src/git/watcher.ts",
+      "contentHash": "6efc75f14815e9309261fffb63864d2939b5856a97b851a692d07d765ff1443f",
+      "functions": [
+        {
+          "name": "watchRepo",
+          "params": [
+            "repoPath",
+            "onChange"
+          ],
+          "returnType": "FSWatcher",
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "watch",
+            "FSWatcher"
+          ]
+        }
+      ],
+      "exports": [
+        "watchRepo"
+      ],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/hook-target.ts": {
+      "filePath": "apps/daemon/src/hook-target.ts",
+      "contentHash": "df7025d70efc07a154c69bbf6a455ea027ed49c7ccb4f24bf53c966030fd4d13",
+      "functions": [
+        {
+          "name": "hookProjectDir",
+          "params": [
+            "payload",
+            "fallback"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "candidateBases",
+          "params": [
+            "payload"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "editedPaths",
+          "params": [
+            "payload"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "inputOf",
+          "params": [
+            "payload"
+          ],
+          "returnType": "Record<string, unknown>",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "toAbsolute",
+          "params": [
+            "filePath",
+            "bases"
+          ],
+          "returnType": "string | null",
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "existingDir",
+          "params": [
+            "filePath"
+          ],
+          "returnType": "string | null",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "isCursorConfig",
+          "params": [
+            "dir"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "existsSync",
+            "statSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "dirname",
+            "isAbsolute",
+            "join",
+            "resolve"
+          ]
+        }
+      ],
+      "exports": [
+        "hookProjectDir"
+      ],
+      "totalLines": 80,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/index.ts": {
+      "filePath": "apps/daemon/src/index.ts",
+      "contentHash": "ffd5ed7ef412bbfff9c5f7d3524f9662fe18dec72bcc9659ad125b6854a9921a",
+      "functions": [
+        {
+          "name": "alive",
+          "params": [
+            "pid"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 8
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:path",
+          "specifiers": [
+            "resolve"
+          ]
+        },
+        {
+          "source": "./panel.ts",
+          "specifiers": [
+            "openPanel"
+          ]
+        },
+        {
+          "source": "./server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        },
+        {
+          "source": "./session/store.ts",
+          "specifiers": [
+            "readDaemonInfo"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/local-file.ts": {
+      "filePath": "apps/daemon/src/local-file.ts",
+      "contentHash": "ba2a5f9284fbfa8acd599825f0bdacea5cf25eba8a930e956831f83519cbcd85",
+      "functions": [
+        {
+          "name": "readLocalLines",
+          "params": [
+            "root",
+            "filePath",
+            "from",
+            "to"
+          ],
+          "returnType": "LocalFileText",
+          "exported": true,
+          "lineCount": 39
+        },
+        {
+          "name": "blank",
+          "params": [
+            "path",
+            "flags"
+          ],
+          "returnType": "LocalFileText",
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "inside",
+          "params": [
+            "root",
+            "filePath"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync",
+            "statSync"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "relative",
+            "resolve",
+            "sep"
+          ]
+        }
+      ],
+      "exports": [
+        "readLocalLines"
+      ],
+      "totalLines": 76,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/panel.ts": {
+      "filePath": "apps/daemon/src/panel.ts",
+      "contentHash": "7172476bf6cf0506a581e9dbe243dc223ce43e4cc1f68c7ff28d9dcb807b332a",
+      "functions": [
+        {
+          "name": "openPanel",
+          "params": [
+            "url"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "ensurePanelBinary",
+          "params": [],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 8
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync",
+            "spawn"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "existsSync",
+            "statSync"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        }
+      ],
+      "exports": [
+        "openPanel"
+      ],
+      "totalLines": 23,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/paths.ts": {
+      "filePath": "apps/daemon/src/paths.ts",
+      "contentHash": "da88a65cbaade7d1c2f6a90465b81263479be7046eec38f8b4b084a6849a85a4",
+      "functions": [
+        {
+          "name": "reviewHome",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "daemonFile",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "databaseFile",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "chmodSync",
+            "mkdirSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        }
+      ],
+      "exports": [
+        "reviewHome",
+        "daemonFile",
+        "databaseFile"
+      ],
+      "totalLines": 19,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/pick-folder.ts": {
+      "filePath": "apps/daemon/src/pick-folder.ts",
+      "contentHash": "0474cea133b5e5aaed7161224474d0d210709f6a8cd6d789c02329631aa9e0aa",
+      "functions": [
+        {
+          "name": "normalizePickedPath",
+          "params": [
+            "text"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "chooseFolder",
+          "params": [],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 26
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFile"
+          ]
+        }
+      ],
+      "exports": [
+        "normalizePickedPath",
+        "chooseFolder"
+      ],
+      "totalLines": 33,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/round.ts": {
+      "filePath": "apps/daemon/src/round.ts",
+      "contentHash": "bfc8881052a8c30bf3124850e54aa1da35ec096dbe92668db5d7697bb87d4489",
+      "functions": [
+        {
+          "name": "ensureRounds",
+          "params": [
+            "db"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "setFinalRound",
+          "params": [
+            "db",
+            "sliceId",
+            "final"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "readFinalRound",
+          "params": [
+            "db",
+            "sliceId"
+          ],
+          "returnType": "boolean | null",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "roundLabel",
+          "params": [
+            "finalRound"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        }
+      ],
+      "exports": [
+        "ensureRounds",
+        "setFinalRound",
+        "readFinalRound",
+        "roundLabel"
+      ],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/server.ts": {
+      "filePath": "apps/daemon/src/server.ts",
+      "contentHash": "5e89350a7994f4160228232dc5b8aa13980e4f0b2458bc30840ba2e76931a5b2",
+      "functions": [
+        {
+          "name": "startServer",
+          "params": [
+            "options"
+          ],
+          "returnType": "Promise<RunningServer>",
+          "exported": true,
+          "lineCount": 640
+        },
+        {
+          "name": "topLevel",
+          "params": [
+            "repoPath"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "authorized",
+          "params": [
+            "req",
+            "token"
+          ],
+          "returnType": "boolean",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "sendJson",
+          "params": [
+            "res",
+            "status",
+            "body"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "readJson",
+          "params": [
+            "req"
+          ],
+          "returnType": "Promise<Record<string, unknown>>",
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "createHash",
+            "randomBytes",
+            "randomUUID"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:http",
+          "specifiers": [
+            "createServer",
+            "IncomingMessage",
+            "ServerResponse"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join",
+            "resolve"
+          ]
+        },
+        {
+          "source": "../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "VERSION"
+          ]
+        },
+        {
+          "source": "./adapters/install.ts",
+          "specifiers": [
+            "installGate"
+          ]
+        },
+        {
+          "source": "./gate/bugfix.ts",
+          "specifiers": [
+            "closeBugfix",
+            "openBugfix",
+            "readBugfix"
+          ]
+        },
+        {
+          "source": "./gate/machine.ts",
+          "specifiers": [
+            "acknowledge",
+            "checkCall",
+            "complete",
+            "GateError",
+            "gateView",
+            "intend",
+            "pinOpenSlices",
+            "reject",
+            "release",
+            "syncRepo"
+          ]
+        },
+        {
+          "source": "./git/diff.ts",
+          "specifiers": [
+            "detectBaseRef",
+            "fileIdFor",
+            "listCommit",
+            "listRange",
+            "listStaged",
+            "listUnstaged",
+            "listWorktree",
+            "parentOf",
+            "patchRange",
+            "repoStatus"
+          ]
+        },
+        {
+          "source": "./git/runner.ts",
+          "specifiers": [
+            "git"
+          ]
+        },
+        {
+          "source": "./git/watcher.ts",
+          "specifiers": [
+            "watchRepo"
+          ]
+        },
+        {
+          "source": "./session/store.ts",
+          "specifiers": [
+            "findRepo",
+            "findRepoByPath",
+            "activeSlice",
+            "findSlice",
+            "insertRepo",
+            "countSlices",
+            "listRepos",
+            "listSlices",
+            "openStore",
+            "SLICE_PAGE_SIZE",
+            "setBaseRef",
+            "toSlice",
+            "writeDaemonInfo"
+          ]
+        },
+        {
+          "source": "./branches.ts",
+          "specifiers": [
+            "checkoutBranch",
+            "listLocalBranches",
+            "startRef"
+          ]
+        },
+        {
+          "source": "./pick-folder.ts",
+          "specifiers": [
+            "chooseFolder"
+          ]
+        },
+        {
+          "source": "./cursor-proxy.ts",
+          "specifiers": [
+            "startCursorProxy",
+            "useCursorProxy"
+          ]
+        },
+        {
+          "source": "./cursor-workspaces.ts",
+          "specifiers": [
+            "cursorRecentStatePath",
+            "readRecentFolderPaths"
+          ]
+        },
+        {
+          "source": "./explain.ts",
+          "specifiers": [
+            "explainInSession",
+            "explainSelection",
+            "loadThreads",
+            "normalizeLines",
+            "readAnchor",
+            "resolveExplainSession"
+          ]
+        },
+        {
+          "source": "./work-branch.ts",
+          "specifiers": [
+            "admitSession",
+            "bindMergeTarget",
+            "currentSessionId",
+            "listWorkSessions",
+            "mergeRequirementIntoBranch",
+            "mergeWorkBranches",
+            "openWorkBranches",
+            "readMergeTarget",
+            "readSessionBranches",
+            "readSessionSummary",
+            "readWorkBranches",
+            "repairSessionRequirements",
+            "sessionPhase"
+          ]
+        },
+        {
+          "source": "./round.ts",
+          "specifiers": [
+            "readFinalRound",
+            "setFinalRound"
+          ]
+        },
+        {
+          "source": "./summary.ts",
+          "specifiers": [
+            "summarizeFile"
+          ]
+        },
+        {
+          "source": "./panel.ts",
+          "specifiers": [
+            "openPanel"
+          ]
+        },
+        {
+          "source": "./local-file.ts",
+          "specifiers": [
+            "readLocalLines"
+          ]
+        },
+        {
+          "source": "./symbols.ts",
+          "specifiers": [
+            "findSymbols",
+            "readSource"
+          ]
+        }
+      ],
+      "exports": [
+        "startServer"
+      ],
+      "totalLines": 723,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/session/store.ts": {
+      "filePath": "apps/daemon/src/session/store.ts",
+      "contentHash": "d83ccf4023b03388465b9399ed20fffc763bd74796dd6da9b492b7c85024a275",
+      "functions": [
+        {
+          "name": "openStore",
+          "params": [],
+          "returnType": "DatabaseSync",
+          "exported": true,
+          "lineCount": 81
+        },
+        {
+          "name": "toSlice",
+          "params": [
+            "row"
+          ],
+          "returnType": "WorkSlice",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "findRepoByPath",
+          "params": [
+            "db",
+            "repoPath"
+          ],
+          "returnType": "RepoRow | undefined",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "findRepo",
+          "params": [
+            "db",
+            "id"
+          ],
+          "returnType": "RepoRow | undefined",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "listRepos",
+          "params": [
+            "db"
+          ],
+          "returnType": "RepoRow[]",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "insertRepo",
+          "params": [
+            "db",
+            "row"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "setBaseRef",
+          "params": [
+            "db",
+            "id",
+            "baseRef"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "activeSlice",
+          "params": [
+            "db",
+            "repoId",
+            "branch"
+          ],
+          "returnType": "SliceRow | undefined",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "findSlice",
+          "params": [
+            "db",
+            "id"
+          ],
+          "returnType": "SliceRow | undefined",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "insertSlice",
+          "params": [
+            "db",
+            "row"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "updateSlice",
+          "params": [
+            "db",
+            "id",
+            "fields"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "countSlices",
+          "params": [
+            "db",
+            "repoId"
+          ],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "listSlices",
+          "params": [
+            "db",
+            "repoId",
+            "page"
+          ],
+          "returnType": "SliceRow[]",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "recordAttempt",
+          "params": [
+            "db",
+            "input"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "writeDaemonInfo",
+          "params": [
+            "info"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "readDaemonInfo",
+          "params": [],
+          "returnType": "DaemonInfo | null",
+          "exported": true,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "randomUUID"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "chmodSync",
+            "existsSync",
+            "readFileSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "../../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "Lease",
+            "SliceState",
+            "WorkSlice"
+          ]
+        },
+        {
+          "source": "../paths.ts",
+          "specifiers": [
+            "databaseFile",
+            "daemonFile"
+          ]
+        }
+      ],
+      "exports": [
+        "openStore",
+        "toSlice",
+        "findRepoByPath",
+        "findRepo",
+        "listRepos",
+        "insertRepo",
+        "setBaseRef",
+        "activeSlice",
+        "findSlice",
+        "insertSlice",
+        "updateSlice",
+        "SLICE_PAGE_SIZE",
+        "countSlices",
+        "listSlices",
+        "recordAttempt",
+        "writeDaemonInfo",
+        "readDaemonInfo"
+      ],
+      "totalLines": 263,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/summary-ai.ts": {
+      "filePath": "apps/daemon/src/summary-ai.ts",
+      "contentHash": "0f087e767db6410bb8adebc0d8d6966035d55a9e95af84d25ddfa6210fd5275c",
+      "functions": [
+        {
+          "name": "summaryPrompt",
+          "params": [
+            "file",
+            "patch"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "responseText",
+          "params": [
+            "payload"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "summarizeDiff",
+          "params": [
+            "file",
+            "patch"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "collectText",
+          "params": [
+            "value",
+            "parts"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "completePrompt",
+          "params": [
+            "prompt"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "ask",
+          "params": [
+            "prompt"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 25
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:crypto",
+          "specifiers": [
+            "createHash"
+          ]
+        },
+        {
+          "source": "../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "FileChange",
+            "FileStatus"
+          ]
+        },
+        {
+          "source": "./cursor-proxy.ts",
+          "specifiers": [
+            "cursorProxyTarget"
+          ]
+        },
+        {
+          "source": "./summary.ts",
+          "specifiers": [
+            "summarizeFile"
+          ]
+        }
+      ],
+      "exports": [
+        "summaryPrompt",
+        "responseText",
+        "summarizeDiff",
+        "completePrompt"
+      ],
+      "totalLines": 110,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/summary.ts": {
+      "filePath": "apps/daemon/src/summary.ts",
+      "contentHash": "3735c074dd3bf14ae3b414320a806d0817a42ad89ef17049984652aef2c8a978",
+      "functions": [
+        {
+          "name": "summarizeFile",
+          "params": [
+            "file",
+            "patch"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "readHunks",
+          "params": [
+            "patch"
+          ],
+          "returnType": "Array<{ heading: string; added: string[]; removed: string[] }>",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "headingNames",
+          "params": [
+            "heading"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "declarations",
+          "params": [
+            "lines"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "featureClause",
+          "params": [
+            "added",
+            "removed"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "phrases",
+          "params": [
+            "lines"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "clip",
+          "params": [
+            "text"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "unique",
+          "params": [
+            "items"
+          ],
+          "returnType": "string[]",
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "FileChange",
+            "FileStatus"
+          ]
+        }
+      ],
+      "exports": [
+        "summarizeFile"
+      ],
+      "totalLines": 97,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/symbols.ts": {
+      "filePath": "apps/daemon/src/symbols.ts",
+      "contentHash": "6885da8a1d49f41ff4f4c65625ddae24cf91a5c0c84807f515493168b3e194d2",
+      "functions": [
+        {
+          "name": "findSymbols",
+          "params": [
+            "root",
+            "identifier",
+            "kind"
+          ],
+          "returnType": "SourceLocation[]",
+          "exported": true,
+          "lineCount": 36
+        },
+        {
+          "name": "walk",
+          "params": [
+            "root",
+            "dir",
+            "visit",
+            "depth"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "readSource",
+          "params": [
+            "root",
+            "filePath",
+            "line"
+          ],
+          "returnType": "{ path: string; line: number; text: string }",
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readdirSync",
+            "readFileSync",
+            "statSync"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join",
+            "relative",
+            "sep"
+          ]
+        },
+        {
+          "source": "../../../../packages/protocol/src/index.ts",
+          "specifiers": [
+            "SourceLocation"
+          ]
+        }
+      ],
+      "exports": [
+        "findSymbols",
+        "readSource"
+      ],
+      "totalLines": 79,
+      "hasStructuralAnalysis": true
+    },
+    "apps/daemon/src/work-branch.ts": {
+      "filePath": "apps/daemon/src/work-branch.ts",
+      "contentHash": "2bdddad47d0720f0fa5fb660dba0104d3317851ffe6f7a2fdf7eb051741f7047",
+      "functions": [
+        {
+          "name": "workBranchNames",
+          "params": [
+            "title"
+          ],
+          "returnType": "{ requirement: string; development: string }",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "sessionSlug",
+          "params": [
+            "sessionId"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "sessionBranchNames",
+          "params": [
+            "sessionId",
+            "summary"
+          ],
+          "returnType": "{ requirement: string; development: string }",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "requirementBranchName",
+          "params": [
+            "summary"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "composerName",
+          "params": [
+            "sessionId",
+            "file"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "userAskFromTranscript",
+          "params": [
+            "text"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "readSessionSummary",
+          "params": [
+            "sessionId"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "cursorStateFile",
+          "params": [],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "firstUserAsk",
+          "params": [
+            "sessionId"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "readWorkBranches",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch"
+          ],
+          "returnType": "{ requirement: string; development: string } | null",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "openWorkBranches",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "baseRef",
+            "title",
+            "fromSession",
+            "summaryText"
+          ],
+          "returnType": "Promise<{ requirement: string; development: string }>",
+          "exported": true,
+          "lineCount": 35
+        },
+        {
+          "name": "mergeWorkBranches",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "headBranch"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "mergeRequirementIntoBranch",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "headBranch",
+            "targetBranch"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "listWorkSessions",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch"
+          ],
+          "returnType": "WorkSession[]",
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "readSessionBranches",
+          "params": [
+            "db",
+            "repoId",
+            "sessionId"
+          ],
+          "returnType": "{ requirement: string; development: string } | null",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "currentSessionId",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "sessionPhase",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch",
+            "sliceId"
+          ],
+          "returnType": "\"requirement\" | \"development\" | null",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "admitSession",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch",
+            "sliceId"
+          ],
+          "returnType": "void",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "readMergeTarget",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "bindMergeTarget",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "headBranch",
+            "target"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "repairSessionRequirements",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "summaries"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 38
+        },
+        {
+          "name": "availableRequirement",
+          "params": [
+            "db",
+            "cwd",
+            "repoId",
+            "name"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "readRecord",
+          "params": [
+            "db",
+            "repoId",
+            "headBranch"
+          ],
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "ensureWorkBranches",
+          "params": [
+            "db"
+          ],
+          "returnType": "void",
+          "exported": false,
+          "lineCount": 40
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "existsSync",
+            "readdirSync",
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "./branches.ts",
+          "specifiers": [
+            "assertBranchName",
+            "checkoutBranch",
+            "createBranch",
+            "listLocalBranches",
+            "mergeBranch",
+            "mergeFastForward",
+            "renameBranch"
+          ]
+        }
+      ],
+      "exports": [
+        "workBranchNames",
+        "sessionSlug",
+        "sessionBranchNames",
+        "requirementBranchName",
+        "composerName",
+        "userAskFromTranscript",
+        "readSessionSummary",
+        "readWorkBranches",
+        "openWorkBranches",
+        "mergeWorkBranches",
+        "mergeRequirementIntoBranch",
+        "listWorkSessions",
+        "readSessionBranches",
+        "currentSessionId",
+        "sessionPhase",
+        "admitSession",
+        "readMergeTarget",
+        "bindMergeTarget",
+        "repairSessionRequirements"
+      ],
+      "totalLines": 371,
+      "hasStructuralAnalysis": true
+    },
+    "apps/mac/Panel.swift": {
+      "filePath": "apps/mac/Panel.swift",
+      "contentHash": "2860813cb80c601ddb435da05901bb86fb257e6016820edfb95185bb07a557bc",
+      "functions": [
+        {
+          "name": "PanelDelegate.init",
+          "params": [
+            "url"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "applicationDidFinishLaunching",
+          "params": [
+            "notification"
+          ],
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "applicationShouldTerminateAfterLastWindowClosed",
+          "params": [
+            "sender"
+          ],
+          "returnType": "Bool",
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [
+        {
+          "name": "PanelDelegate",
+          "methods": [
+            "init",
+            "applicationDidFinishLaunching",
+            "applicationShouldTerminateAfterLastWindowClosed"
+          ],
+          "properties": [
+            "window"
+          ],
+          "exported": true,
+          "lineCount": 30
+        }
+      ],
+      "imports": [
+        {
+          "source": "Cocoa",
+          "specifiers": [
+            "Cocoa"
+          ]
+        },
+        {
+          "source": "WebKit",
+          "specifiers": [
+            "WebKit"
+          ]
+        }
+      ],
+      "exports": [
+        "window",
+        "PanelDelegate.init",
+        "applicationDidFinishLaunching",
+        "applicationShouldTerminateAfterLastWindowClosed",
+        "PanelDelegate"
+      ],
+      "totalLines": 46,
+      "hasStructuralAnalysis": true
+    },
+    "apps/web/app.css": {
+      "filePath": "apps/web/app.css",
+      "contentHash": "7d7868b0572bc7e1f3e98ac8d259f29627d8604e1b68b3f12a9aad5cbb21dab0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 213,
+      "hasStructuralAnalysis": false
+    },
+    "apps/web/app.js": {
+      "filePath": "apps/web/app.js",
+      "contentHash": "2ac81a460dbf7acc779047d539230b81d926b51ab4779bcb05320a919ec99b4e",
+      "functions": [
+        {
+          "name": "gateLabel",
+          "params": [
+            "gate"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "$",
+          "params": [
+            "id"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "api",
+          "params": [
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "bootRepo",
+          "params": [],
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "folderName",
+          "params": [
+            "repoPath"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "repoLabel",
+          "params": [
+            "repo",
+            "repos"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "renderWorkBranches",
+          "params": [
+            "status"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "shownBranches",
+          "params": [
+            "status"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "renderRepoSelect",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "pickRepo",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "registerRepo",
+          "params": [],
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "switchRepo",
+          "params": [
+            "repoId"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "resetView",
+          "params": [],
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "connect",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "diffQuery",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "activeSessionId",
+          "params": [
+            "sessions"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "refresh",
+          "params": [],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "syncRepoList",
+          "params": [],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "loadPanel",
+          "params": [],
+          "exported": false,
+          "lineCount": 68
+        },
+        {
+          "name": "renderBugfix",
+          "params": [
+            "gate"
+          ],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "submitBugfix",
+          "params": [
+            "event"
+          ],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "renderSummary",
+          "params": [
+            "gate"
+          ],
+          "exported": false,
+          "lineCount": 57
+        },
+        {
+          "name": "decision",
+          "params": [
+            "label",
+            "onClick"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "act",
+          "params": [
+            "name",
+            "sliceId"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "fillBranches",
+          "params": [
+            "select"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "admit",
+          "params": [
+            "sliceId",
+            "select"
+          ],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "verify",
+          "params": [
+            "sliceId",
+            "select"
+          ],
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "showFileHead",
+          "params": [
+            "pathText",
+            "summary"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "classNameOf",
+          "params": [
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "copyClassName",
+          "params": [
+            "text",
+            "button"
+          ],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "renderFiles",
+          "params": [
+            "files"
+          ],
+          "exported": false,
+          "lineCount": 41
+        },
+        {
+          "name": "renderPatch",
+          "params": [],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "renderViewbar",
+          "params": [],
+          "exported": false,
+          "lineCount": 35
+        },
+        {
+          "name": "viewButton",
+          "params": [
+            "label",
+            "active",
+            "onClick"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "unified",
+          "params": [
+            "patch"
+          ],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "split",
+          "params": [
+            "patch"
+          ],
+          "exported": false,
+          "lineCount": 49
+        },
+        {
+          "name": "lineRow",
+          "params": [
+            "text",
+            "type",
+            "primary",
+            "secondary",
+            "side",
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 25
+        },
+        {
+          "name": "lineKey",
+          "params": [
+            "row"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "sideLines",
+          "params": [
+            "row"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "keysBetween",
+          "params": [
+            "row",
+            "fromKey",
+            "toKey"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "startLineDrag",
+          "params": [
+            "event",
+            "row"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "moveLineDrag",
+          "params": [
+            "event"
+          ],
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "finishLineDrag",
+          "params": [],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "pickLine",
+          "params": [
+            "event",
+            "row"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "paintPicked",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "selectedLines",
+          "params": [],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "anchorKey",
+          "params": [
+            "anchor"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "contiguousGroups",
+          "params": [
+            "lines"
+          ],
+          "exported": false,
+          "lineCount": 34
+        },
+        {
+          "name": "linesBetween",
+          "params": [
+            "anchor"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "placeExplainBars",
+          "params": [],
+          "exported": false,
+          "lineCount": 23
+        },
+        {
+          "name": "explainDock",
+          "params": [
+            "group"
+          ],
+          "exported": false,
+          "lineCount": 54
+        },
+        {
+          "name": "explainBubble",
+          "params": [
+            "group",
+            "mode"
+          ],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "threadModes",
+          "params": [
+            "key"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "restoreExplainBubbles",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "openExplain",
+          "params": [
+            "group"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "chooseExplain",
+          "params": [
+            "group",
+            "mode"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "requestExplain",
+          "params": [
+            "group",
+            "mode"
+          ],
+          "exported": false,
+          "lineCount": 28
+        },
+        {
+          "name": "rememberThread",
+          "params": [
+            "result",
+            "group"
+          ],
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "explainPending",
+          "params": [],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "sendComment",
+          "params": [
+            "group",
+            "text"
+          ],
+          "exported": false,
+          "lineCount": 35
+        },
+        {
+          "name": "symbols",
+          "params": [
+            "kind"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "openLocation",
+          "params": [
+            "item"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "identifierFrom",
+          "params": [
+            "event"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "renderSessions",
+          "params": [
+            "active"
+          ],
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "emptyDiffText",
+          "params": [
+            "gate"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "openSession",
+          "params": [
+            "item"
+          ],
+          "exported": false,
+          "lineCount": 15
+        },
+        {
+          "name": "renderHistory",
+          "params": [
+            "page"
+          ],
+          "exported": false,
+          "lineCount": 43
+        },
+        {
+          "name": "pageButton",
+          "params": [
+            "text",
+            "disabled",
+            "onClick"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "pageLabel",
+          "params": [
+            "text"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "showNotice",
+          "params": [
+            "text"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "showError",
+          "params": [
+            "error"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1266,
+      "hasStructuralAnalysis": true
+    },
+    "apps/web/index.html": {
+      "filePath": "apps/web/index.html",
+      "contentHash": "a777bc7f14f0ec32f6d054b4f0d0456f692e3ef41f6a8c63d6bef8aaa6fa14c7",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 88,
+      "hasStructuralAnalysis": false
+    },
+    "docs/architecture.md": {
+      "filePath": "docs/architecture.md",
+      "contentHash": "a18745c29891d3318e963d1886241d75cfcdf60f5f6bd59acdfb42930abcea38",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 407,
+      "hasStructuralAnalysis": false
+    },
+    "mac/install.sh": {
+      "filePath": "mac/install.sh",
+      "contentHash": "9ba3c67be333366891b77c08994c1e890fa914d2f830e143715024f26a20ca88",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": false
+    },
+    "mac/代码评审.app/Contents/Info.plist": {
+      "filePath": "mac/代码评审.app/Contents/Info.plist",
+      "contentHash": "98c8924bce04c1558366e2e3e61798df0f1fa467a472a6054286eb5d3c35ccbe",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 28,
+      "hasStructuralAnalysis": false
+    },
+    "mac/代码评审.app/Contents/MacOS/launch": {
+      "filePath": "mac/代码评审.app/Contents/MacOS/launch",
+      "contentHash": "220e2664470ef4788f5b3ac718c5b9bed1b8563f0928da0cada2d182b94cfcf7",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 52,
+      "hasStructuralAnalysis": false
+    },
+    "mac/代码评审.app/Contents/MacOS/panel": {
+      "filePath": "mac/代码评审.app/Contents/MacOS/panel",
+      "contentHash": "bc9fefe3d9219e5cb67a3bac3e4bd16ca0d50d12758293018ca31f0d55ee3f88",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 84,
+      "hasStructuralAnalysis": false
+    },
+    "package.json": {
+      "filePath": "package.json",
+      "contentHash": "8ea93132efc4bc353be83f4553111523de8b081ff22897c1ccec31949a241d77",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 11,
+      "hasStructuralAnalysis": false
+    },
+    "packages/protocol/src/index.ts": {
+      "filePath": "packages/protocol/src/index.ts",
+      "contentHash": "c2ccf5ff86b3568e5d20472942179a6a2283c5f9bcb3b2f3dea1d7694f0f2be1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "VERSION"
+      ],
+      "totalLines": 67,
+      "hasStructuralAnalysis": true
+    },
+    "test/branch-gate.test.ts": {
+      "filePath": "test/branch-gate.test.ts",
+      "contentHash": "22e2a782fb0422a4581b1c35f8bfc5d763b96229054f7273358e5687e7f7d687",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path",
+            "body"
+          ],
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 80,
+      "hasStructuralAnalysis": true
+    },
+    "test/bugfix.test.ts": {
+      "filePath": "test/bugfix.test.ts",
+      "contentHash": "96ed8a741c8741e4c0713890fdeb0391bfff2fa1e8e08cd20bf918b333ac2da5",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path",
+            "body"
+          ],
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/gate/policy.ts",
+          "specifiers": [
+            "decide"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 74,
+      "hasStructuralAnalysis": true
+    },
+    "test/complete-count.test.ts": {
+      "filePath": "test/complete-count.test.ts",
+      "contentHash": "1c669b06efd0bc435a8a4d21b76828f2d0c9be7cd3a29e006279cf413581aba2",
+      "functions": [
+        {
+          "name": "git",
+          "params": [
+            "cwd",
+            "args"
+          ],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/gate/machine.ts",
+          "specifiers": [
+            "complete",
+            "GateError"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/session/store.ts",
+          "specifiers": [
+            "insertSlice",
+            "openStore"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 65,
+      "hasStructuralAnalysis": true
+    },
+    "test/cursor-proxy.test.ts": {
+      "filePath": "test/cursor-proxy.test.ts",
+      "contentHash": "7be29bfc817365038340f42da371f3aec34f86c972f3b1f43357c226d99e1428",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/cursor-proxy.ts",
+          "specifiers": [
+            "agentArgs",
+            "promptInput",
+            "startCursorProxy",
+            "useCursorProxy"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/summary-ai.ts",
+          "specifiers": [
+            "completePrompt"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 49,
+      "hasStructuralAnalysis": true
+    },
+    "test/cursor-workspaces.test.ts": {
+      "filePath": "test/cursor-workspaces.test.ts",
+      "contentHash": "57f9dacb347bcd3d76891f8b04b5940f44518a34ae74a1d2626f0c205735cdec",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "node:url",
+          "specifiers": [
+            "pathToFileURL"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/cursor-workspaces.ts",
+          "specifiers": [
+            "recentFolderPaths"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 77,
+      "hasStructuralAnalysis": true
+    },
+    "test/explain.test.ts": {
+      "filePath": "test/explain.test.ts",
+      "contentHash": "5373038475ec823ca758d69e4ed60125ab673184d0f40462ef00e93de319b54c",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "readFileSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/explain.ts",
+          "specifiers": [
+            "applySelectionEdit",
+            "explainPrompt",
+            "explainSelection",
+            "loadThreads",
+            "loadTurns",
+            "normalizeLines",
+            "parseCommentAction",
+            "readAnchor",
+            "remember",
+            "resolveExplainSession",
+            "saveExplainMode",
+            "saveThread",
+            "saveTurns",
+            "selectionAnchors",
+            "sessionPrompt",
+            "threadFor"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/work-branch.ts",
+          "specifiers": [
+            "currentSessionId",
+            "listWorkSessions",
+            "readSessionBranches"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 160,
+      "hasStructuralAnalysis": true
+    },
+    "test/git-lock.test.ts": {
+      "filePath": "test/git-lock.test.ts",
+      "contentHash": "0378405ffde76a2765ff299370adfa3bdeff50fdfdf039251c478ff9362d59e1",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/git/lock.ts",
+          "specifiers": [
+            "enqueueGit",
+            "retryOnIndexLock"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 32,
+      "hasStructuralAnalysis": true
+    },
+    "test/local-file.test.ts": {
+      "filePath": "test/local-file.test.ts",
+      "contentHash": "895abaac581483cf2360ff6edc10338c5930273352e2babebd67c4db1df499c0",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/local-file.ts",
+          "specifiers": [
+            "readLocalLines"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "test/merge-target.test.ts": {
+      "filePath": "test/merge-target.test.ts",
+      "contentHash": "cc8de2081e6dce534f7c35dc44df1f6f26c5950ed97eb90fd522c6d83ec21b4c",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path",
+            "body",
+            "expectOk"
+          ],
+          "exported": false,
+          "lineCount": 17
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 75,
+      "hasStructuralAnalysis": true
+    },
+    "test/phase1.test.ts": {
+      "filePath": "test/phase1.test.ts",
+      "contentHash": "86404cc0105966de8c3cefaf0555c88710eca2d2c6273d41547b3bbbf8154748",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path",
+            "body",
+            "expectOk"
+          ],
+          "exported": false,
+          "lineCount": 11
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/git/diff.ts",
+          "specifiers": [
+            "parseNumstat",
+            "parseUnified"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/session/store.ts",
+          "specifiers": [
+            "assignSliceSession",
+            "toSlice"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/gate/policy.ts",
+          "specifiers": [
+            "decide"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 139,
+      "hasStructuralAnalysis": true
+    },
+    "test/round.test.ts": {
+      "filePath": "test/round.test.ts",
+      "contentHash": "4b3f965fd1760daccba5fca28040b8e92d14a3e16b4131935bc1775fd84938d3",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/round.ts",
+          "specifiers": [
+            "roundLabel"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 10,
+      "hasStructuralAnalysis": true
+    },
+    "test/session-review.test.ts": {
+      "filePath": "test/session-review.test.ts",
+      "contentHash": "c9061d2e0bf7fd0810cca8b5607e3dacd2a540efc7fd24bc29d16053bc9b71fe",
+      "functions": [
+        {
+          "name": "call",
+          "params": [
+            "server",
+            "method",
+            "path",
+            "body"
+          ],
+          "exported": false,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "rmSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/server.ts",
+          "specifiers": [
+            "startServer"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 69,
+      "hasStructuralAnalysis": true
+    },
+    "test/summary.test.ts": {
+      "filePath": "test/summary.test.ts",
+      "contentHash": "3e50ceb9c6a8decb49ed71d06f052d1131dde96d224e1f437cf503d5f5459e1b",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/summary.ts",
+          "specifiers": [
+            "summarizeFile"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/summary-ai.ts",
+          "specifiers": [
+            "summaryPrompt",
+            "responseText"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 40,
+      "hasStructuralAnalysis": true
+    },
+    "test/user-hook.test.ts": {
+      "filePath": "test/user-hook.test.ts",
+      "contentHash": "b895bf69187b10c9f37373ad5381a5a783b61e3d4089e3e1b0d1826f80f185e0",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "mkdirSync",
+            "readFileSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "homedir",
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/adapters/install.ts",
+          "specifiers": [
+            "installGate"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/hook-target.ts",
+          "specifiers": [
+            "hookProjectDir"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 48,
+      "hasStructuralAnalysis": true
+    },
+    "test/work-branch.test.ts": {
+      "filePath": "test/work-branch.test.ts",
+      "contentHash": "ea9f7301fbbdd5d2bb99ecaceab2ace3989efc4a6a95bcae578e9ca1f751b2a7",
+      "functions": [
+        {
+          "name": "git",
+          "params": [
+            "cwd",
+            "args"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "rememberBranches",
+          "params": [
+            "db"
+          ],
+          "exported": false,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "mkdtempSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:os",
+          "specifiers": [
+            "tmpdir"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "join"
+          ]
+        },
+        {
+          "source": "node:sqlite",
+          "specifiers": [
+            "DatabaseSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/branches.ts",
+          "specifiers": [
+            "mergeFastForward",
+            "startRef"
+          ]
+        },
+        {
+          "source": "../apps/daemon/src/work-branch.ts",
+          "specifiers": [
+            "admitSession",
+            "composerName",
+            "mergeRequirementIntoBranch",
+            "mergeWorkBranches",
+            "openWorkBranches",
+            "sessionBranchNames",
+            "sessionPhase",
+            "userAskFromTranscript",
+            "workBranchNames"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 260,
+      "hasStructuralAnalysis": true
+    }
+  }
+}
