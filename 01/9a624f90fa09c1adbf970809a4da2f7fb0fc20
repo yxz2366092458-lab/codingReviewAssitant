@@ -1,0 +1,19 @@
+apps/web/app.js
+  s_f5512ce62ada0a::t_c120f21f322cce 271-279
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "019a624f90fa09c1adbf970809a4da2f7fb0fc20",
+  "prompts": {},
+  "sessions": {
+    "s_f5512ce62ada0a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fd49d693-f134-4aee-adc9-fb688f29cdfe",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
