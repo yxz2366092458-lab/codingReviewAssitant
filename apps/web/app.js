@@ -292,6 +292,10 @@ async function loadPanel() {
   renderFiles(diff.files ?? []);
   renderHistory(slices);
   if (!state.fileId && diff.files?.[0]) state.fileId = diff.files[0].fileId;
+  if (state.mode === "impact") {
+    await renderImpact();
+    return;
+  }
   if (state.fileId && (diff.files ?? []).some((file) => file.fileId === state.fileId)) await renderPatch();
   else {
     $("diff").replaceChildren();
@@ -539,6 +543,151 @@ async function renderPatch() {
   placeExplainBars();
 }
 
+const IMPACT_EDGE_LABEL = {
+  imports: "导入",
+  calls: "调用",
+  depends_on: "依赖",
+  tested_by: "测试",
+  configures: "配置",
+  middleware: "中间件",
+  triggers: "触发",
+  reads_from: "读取",
+  writes_to: "写入",
+  subscribes: "订阅",
+  publishes: "发布",
+};
+
+async function renderImpact() {
+  showFileHead("影响链", "只画当前差异对应的节点，以及直接连到这些节点的影响边。");
+  renderViewbar();
+  const diff = $("diff");
+  diff.replaceChildren();
+  try {
+    diff.append(impactGraph(await api(`/repos/${state.repoId}/impact?${diffQuery()}`)));
+  } catch (error) {
+    diff.append(emptyNote(error instanceof Error ? error.message : "影响链没有画出来"));
+  }
+}
+
+function impactGraph(chain) {
+  const wrap = document.createElement("div");
+  wrap.className = "impact";
+  if (!chain.available) {
+    wrap.append(emptyNote("这个仓库还没有知识图谱，影响链画不出来。"));
+    return wrap;
+  }
+  const nodes = chain.nodes ?? [];
+  const edges = chain.edges ?? [];
+  if (!nodes.length) {
+    wrap.append(emptyNote("当前差异在知识图谱里没有对应节点。"));
+    return wrap;
+  }
+  const legend = document.createElement("p");
+  legend.className = "impact-legend";
+  legend.innerHTML = `<span><i class="changed"></i>改动</span><span><i class="affected"></i>受影响</span>`;
+  wrap.append(legend);
+  if (!edges.length) wrap.append(emptyNote("这些改动没有直接的影响边。"));
+  wrap.append(impactSvg(nodes, edges));
+  return wrap;
+}
+
+function emptyNote(text) {
+  const note = document.createElement("p");
+  note.className = "empty";
+  note.textContent = text;
+  return note;
+}
+
+function impactSvg(nodes, edges) {
+  const width = 200;
+  const height = 52;
+  const gapX = 120;
+  const gapY = 18;
+  const pad = 24;
+  const changedIds = new Set(nodes.filter((node) => node.role === "changed").map((node) => node.id));
+  const sideOf = (node) => {
+    if (node.role === "changed") return "changed";
+    const toward = edges.some((edge) => edge.source === node.id && changedIds.has(edge.target));
+    return toward ? "upstream" : "downstream";
+  };
+  const columns = { upstream: [], changed: [], downstream: [] };
+  for (const node of nodes) columns[sideOf(node)].push(node);
+  const used = ["upstream", "changed", "downstream"].filter((key) => columns[key].length);
+  const place = new Map();
+  used.forEach((key, column) => {
+    columns[key].forEach((node, row) => {
+      place.set(node.id, { x: pad + column * (width + gapX), y: pad + row * (height + gapY) });
+    });
+  });
+  const rows = Math.max(...used.map((key) => columns[key].length), 1);
+  const svg = svgEl("svg", {
+    width: pad * 2 + used.length * width + Math.max(0, used.length - 1) * gapX,
+    height: pad * 2 + rows * height + Math.max(0, rows - 1) * gapY,
+    role: "img",
+    "aria-label": "改动影响链",
+  });
+  const marker = svgEl("marker", { id: "impact-arrow", viewBox: "0 0 8 8", refX: "8", refY: "4", markerWidth: "8", markerHeight: "8", orient: "auto" });
+  marker.append(svgEl("path", { d: "M0,0 L8,4 L0,8 Z" }));
+  const defs = svgEl("defs", {});
+  defs.append(marker);
+  svg.append(defs);
+  for (const edge of edges) {
+    const from = place.get(edge.source);
+    const to = place.get(edge.target);
+    if (!from || !to) continue;
+    const start = boxPoint(from, to, width, height);
+    const end = boxPoint(to, from, width, height);
+    const line = svgEl("line", { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: "impact-edge", "marker-end": "url(#impact-arrow)" });
+    svg.append(line);
+    const label = svgEl("text", {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2 - 4,
+      "text-anchor": "middle",
+      class: "impact-edge-label",
+    });
+    label.textContent = IMPACT_EDGE_LABEL[edge.type] ?? edge.type;
+    svg.append(label);
+  }
+  for (const node of nodes) {
+    const at = place.get(node.id);
+    const group = svgEl("g", { transform: `translate(${at.x} ${at.y})` });
+    group.append(svgEl("rect", { width, height, rx: "8", class: node.role === "changed" ? "impact-node changed" : "impact-node" }));
+    const name = svgEl("text", { x: "12", y: "22", class: "impact-name" });
+    name.textContent = clipText(node.name, 22);
+    const path = svgEl("text", { x: "12", y: "40", class: "impact-path" });
+    path.textContent = clipText(node.filePath || node.type, 28);
+    group.append(name, path);
+    const title = svgEl("title", {});
+    title.textContent = node.summary || node.name;
+    group.append(title);
+    svg.append(group);
+  }
+  return svg;
+}
+
+function boxPoint(from, to, width, height) {
+  const cx = from.x + width / 2;
+  const cy = from.y + height / 2;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (!dx && !dy) return { x: cx, y: cy };
+  const scaleX = dx === 0 ? Infinity : (width / 2) / Math.abs(dx);
+  const scaleY = dy === 0 ? Infinity : (height / 2) / Math.abs(dy);
+  const scale = Math.min(scaleX, scaleY);
+  return { x: cx + dx * scale, y: cy + dy * scale };
+}
+
+function clipText(text, max) {
+  const value = text || "";
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+function svgEl(name, attrs) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
+}
+
 function renderViewbar() {
   const bar = $("viewbar");
   bar.className = "viewbar";
@@ -549,15 +698,18 @@ function renderViewbar() {
   const row = document.createElement("div");
   row.className = "row";
   row.append(
-    viewButton("单文件", state.mode === "unified", () => { state.mode = "unified"; }),
-    viewButton("双文件", state.mode === "split", () => { state.mode = "split"; }),
+    viewButton("单文件", state.mode === "unified", () => { state.mode = "unified"; return refresh(); }),
+    viewButton("双文件", state.mode === "split", () => { state.mode = "split"; return refresh(); }),
+    viewButton("影响链", state.mode === "impact", () => { state.mode = "impact"; return refresh(); }),
     viewButton("定义", state.symbol === "definition", () => void symbols("definition")),
     viewButton("引用", state.symbol === "references", () => void symbols("references")),
   );
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
+  hint.textContent = state.mode === "impact"
+    ? "这张图只包含当前差异对应的节点，以及直接连到这些节点的影响边。左边是影响到改动的节点，右边是改动所影响到的节点。"
+    : "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
