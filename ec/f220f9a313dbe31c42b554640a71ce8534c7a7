@@ -1,0 +1,37 @@
+.ua/fingerprints.json
+  s_9e88c89495c81d::t_c22eb33d8c2d74 1-4811
+.ua/knowledge-graph.json
+  s_9e88c89495c81d::t_c22eb33d8c2d74 1-8719
+.ua/intermediate/scan-result.json
+  s_15de10a6548b0d::t_c37bc3cb64a420 1-527
+.ua/meta.json
+  s_9e88c89495c81d::t_573ec0c4d4018c 1-6
+.ua/.understandignore
+  s_9e88c89495c81d::t_7fa187ee41cdf7 1-69
+.ua/config.json
+  s_9e88c89495c81d::t_c181818540482b 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ecf220f9a313dbe31c42b554640a71ce8534c7a7",
+  "prompts": {},
+  "sessions": {
+    "s_15de10a6548b0d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "29b66a6e-f10c-45cf-a24f-ac0f0c6ae711",
+        "model": "grok-4.7-high-fast"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    },
+    "s_9e88c89495c81d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eef70eca-1f3a-4c0a-b22c-e9c89cd2696b",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
