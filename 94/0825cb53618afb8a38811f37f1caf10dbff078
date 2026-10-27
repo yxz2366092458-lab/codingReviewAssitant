@@ -1,0 +1,44 @@
+apps/web/index.html
+  s_b68cca9ae96ff6::t_654c312305a4d4 85
+  s_b68cca9ae96ff6::t_a397357bca44dd 7
+apps/web/app.js
+  s_b68cca9ae96ff6::t_27b13852042218 563
+  s_b68cca9ae96ff6::t_81e68228a3cc5c 604,606-607,616-618,620-623,625-630,633
+  s_b68cca9ae96ff6::t_13daaa7a52b09f 657-675
+  s_b68cca9ae96ff6::t_090b1c369ab8d7 1-2
+  s_b68cca9ae96ff6::t_040c70eed3ec09 724
+test/impact-layout.test.ts
+  s_b68cca9ae96ff6::t_d8f8534e0dd4d1 64-82
+  s_b68cca9ae96ff6::t_4a4d66cef01bae 1-63
+apps/daemon/src/server.ts
+  s_b68cca9ae96ff6::t_0f59e0834b3480 207
+apps/daemon/src/impact.ts
+  s_b68cca9ae96ff6::t_529b78a661bd13 48
+  s_b68cca9ae96ff6::t_c24002e3656118 109-112
+  s_b68cca9ae96ff6::t_d6aaf47069ce98 120-156
+  s_b68cca9ae96ff6::t_13680d20b71513 27
+  s_b68cca9ae96ff6::t_0f8e87a5c59052 80,92
+apps/web/impact-layout.js
+  s_b68cca9ae96ff6::t_8e0ab377b4167d 1-347
+test/impact.test.ts
+  s_b68cca9ae96ff6::t_ae24bea4767f5b 44-62
+apps/web/app.css
+  s_b68cca9ae96ff6::t_9d336a62435626 220
+  s_b68cca9ae96ff6::t_84fad48a547d5c 214-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "940825cb53618afb8a38811f37f1caf10dbff078",
+  "prompts": {},
+  "sessions": {
+    "s_b68cca9ae96ff6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "212ea985-2de0-4b2c-9cdc-dfd15955f763",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
