@@ -204,7 +204,7 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       res.end(html);
       return;
     }
-    if (req.method === "GET" && (path === "/app.js" || path === "/app.css")) {
+    if (req.method === "GET" && (path === "/app.js" || path === "/app.css" || path === "/impact-layout.js")) {
       const type = path.endsWith(".js") ? "text/javascript" : "text/css";
       res.writeHead(200, { "content-type": `${type}; charset=utf-8`, "cache-control": "no-store" });
       res.end(readFileSync(join(webRoot, path.slice(1))));

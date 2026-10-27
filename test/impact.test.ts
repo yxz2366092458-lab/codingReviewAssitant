@@ -41,6 +41,25 @@ test("只保留改动节点和直接碰到它们的影响边", () => {
   ]);
 });
 
+test("落在类行范围内的方法挂到该类下面", () => {
+  const chain = extractImpactChain({
+    nodes: [
+      { id: "file:src/A.java", type: "file", name: "A.java", filePath: "src/A.java", summary: "", lineRange: [1, 80] },
+      { id: "class:src/A.java:A", type: "class", name: "A", filePath: "src/A.java", summary: "类", lineRange: [1, 40] },
+      { id: "function:src/A.java:run", type: "function", name: "run", filePath: "src/A.java", summary: "方法", lineRange: [10, 20] },
+      { id: "function:src/A.java:helper", type: "function", name: "helper", filePath: "src/A.java", summary: "类外面的函数", lineRange: [50, 60] },
+      { id: "function:src/B.java:call", type: "function", name: "call", filePath: "src/B.java", summary: "调用方", lineRange: [1, 8] },
+    ],
+    edges: [
+      { source: "function:src/B.java:call", target: "function:src/A.java:run", type: "calls" },
+    ],
+  }, ["src/B.java"]);
+  assert.equal(chain.nodes.find((node) => node.id === "function:src/A.java:run")?.parentId, "class:src/A.java:A");
+  assert.equal(chain.nodes.find((node) => node.id === "function:src/B.java:call")?.parentId, null);
+  assert.equal(chain.nodes.find((node) => node.id === "class:src/A.java:A")?.role, "affected");
+  assert.equal(chain.nodes.some((node) => node.id === "function:src/A.java:helper"), false);
+});
+
 test("旧路径也能对上改动节点", () => {
   const chain = extractImpactChain(graph, ["./src/a.ts"]);
   assert.equal(chain.nodes.find((node) => node.id === "file:src/a.ts")?.role, "changed");

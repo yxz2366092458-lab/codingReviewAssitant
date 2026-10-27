@@ -1,3 +1,5 @@
+import { layoutImpact } from "./impact-layout.js";
+
 const boot = window.__REVIEW__;
 const state = {
   repoId: "",
@@ -558,7 +560,7 @@ const IMPACT_EDGE_LABEL = {
 };
 
 async function renderImpact() {
-  showFileHead("影响链", "符号挂在各自的文件模块下面，只保留直接连到改动的影响边。");
+  showFileHead("影响链", "方法挂在所属类下面，只保留直接连到改动的影响边。");
   renderViewbar();
   const diff = $("diff");
   diff.replaceChildren();
@@ -599,27 +601,10 @@ function emptyNote(text) {
 }
 
 function impactSvg(nodes, edges) {
-  const nodeW = 200;
-  const nodeH = 32;
-  const gapX = 72;
-  const gapY = 8;
-  const pad = 24;
-  const framePad = 12;
-  const headH = 48;
-  const frameGap = 16;
-  const frames = layoutModules(nodes, edges, { nodeW, nodeH, gapX, gapY, pad, framePad, headH, frameGap });
-  const place = new Map();
-  let width = pad;
-  let height = pad;
-  for (const frame of frames) {
-    width = Math.max(width, frame.x + frame.w + pad);
-    height = Math.max(height, frame.y + frame.h + pad);
-    if (frame.file) place.set(frame.file.id, frame);
-    for (const child of frame.children) place.set(child.node.id, child);
-  }
+  const layout = layoutImpact(nodes, edges);
   const svg = svgEl("svg", {
-    width,
-    height,
+    width: layout.width,
+    height: layout.height,
     role: "img",
     "aria-label": "改动影响链",
   });
@@ -628,81 +613,24 @@ function impactSvg(nodes, edges) {
   const defs = svgEl("defs", {});
   defs.append(marker);
   svg.append(defs);
-  for (const frame of frames) svg.append(moduleFrame(frame));
-  for (const edge of edges) {
-    const from = place.get(edge.source);
-    const to = place.get(edge.target);
-    if (!from || !to) continue;
-    const start = boxPoint(from, to);
-    const end = boxPoint(to, from);
-    svg.append(svgEl("line", { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: "impact-edge", "marker-end": "url(#impact-arrow)" }));
-    const label = svgEl("text", {
-      x: (start.x + end.x) / 2,
-      y: (start.y + end.y) / 2 - 4,
-      "text-anchor": "middle",
-      class: "impact-edge-label",
-    });
-    label.textContent = IMPACT_EDGE_LABEL[edge.type] ?? edge.type;
-    svg.append(label);
+  for (const route of layout.routes) {
+    svg.append(svgEl("path", { d: route.trunk, class: "impact-edge" }));
+    for (const d of route.branches) svg.append(svgEl("path", { d, class: "impact-edge", "marker-end": "url(#impact-arrow)" }));
   }
-  for (const frame of frames) {
-    for (const child of frame.children) svg.append(symbolNode(child));
+  for (const label of layout.labels) {
+    const text = svgEl("text", { x: label.x, y: label.y, "text-anchor": "start", class: "impact-edge-label" });
+    text.textContent = IMPACT_EDGE_LABEL[label.type] ?? label.type;
+    svg.append(text);
+  }
+  for (const frame of layout.frames) {
+    svg.append(moduleFrame(frame));
+    for (const block of frame.blocks) {
+      if (block.kind === "class") svg.append(classNode(block));
+      const symbols = block.kind === "class" ? block.methods : [block];
+      for (const child of symbols) svg.append(symbolNode(child));
+    }
   }
   return svg;
-}
-
-function layoutModules(nodes, edges, metrics) {
-  const { nodeW, nodeH, gapX, gapY, pad, framePad, headH, frameGap } = metrics;
-  const changedIds = new Set(nodes.filter((node) => node.role === "changed").map((node) => node.id));
-  const groups = new Map();
-  for (const node of nodes) {
-    const key = node.filePath || node.id;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(node);
-  }
-  const columns = { upstream: [], changed: [], downstream: [] };
-  for (const members of groups.values()) {
-    const ids = new Set(members.map((node) => node.id));
-    const changed = members.some((node) => node.role === "changed");
-    const toward = edges.some((edge) => ids.has(edge.source) && changedIds.has(edge.target));
-    const side = changed ? "changed" : toward ? "upstream" : "downstream";
-    const file = members.find((node) => node.type === "file" || node.type === "config" || node.type === "document") ?? null;
-    const children = members
-      .filter((node) => node !== file)
-      .sort((a, b) => a.name.localeCompare(b.name, "zh"));
-    const head = file?.name || children[0]?.filePath?.split("/").pop() || members[0].name;
-    const path = file?.filePath || children[0]?.filePath || "";
-    columns[side].push({
-      head,
-      path,
-      changed: members.some((node) => node.role === "changed"),
-      file,
-      children: children.map((node) => ({ node, x: 0, y: 0, w: nodeW, h: nodeH })),
-      x: 0,
-      y: 0,
-      w: nodeW + framePad * 2,
-      h: headH + (children.length ? children.length * nodeH + (children.length - 1) * gapY + 8 : 8),
-    });
-  }
-  const used = ["upstream", "changed", "downstream"].filter((key) => columns[key].length);
-  let x = pad;
-  const frames = [];
-  for (const key of used) {
-    let y = pad;
-    const ordered = columns[key].sort((a, b) => a.head.localeCompare(b.head, "zh"));
-    for (const frame of ordered) {
-      frame.x = x;
-      frame.y = y;
-      frame.children.forEach((child, index) => {
-        child.x = x + framePad;
-        child.y = y + headH + index * (nodeH + gapY);
-      });
-      frames.push(frame);
-      y += frame.h + frameGap;
-    }
-    x += nodeW + framePad * 2 + gapX;
-  }
-  return frames;
 }
 
 function moduleFrame(frame) {
@@ -726,6 +654,25 @@ function moduleFrame(frame) {
   return group;
 }
 
+function classNode(block) {
+  const group = svgEl("g", {});
+  group.append(svgEl("rect", {
+    x: block.x,
+    y: block.y,
+    width: block.w,
+    height: block.h,
+    rx: "8",
+    class: block.changed ? "impact-class changed" : "impact-class",
+  }));
+  const name = svgEl("text", { x: block.x + 10, y: block.y + 18, class: "impact-name" });
+  name.textContent = clipText(block.node.name, 22);
+  group.append(name);
+  const title = svgEl("title", {});
+  title.textContent = block.node.summary || block.node.name;
+  group.append(title);
+  return group;
+}
+
 function symbolNode(child) {
   const group = svgEl("g", { transform: `translate(${child.x} ${child.y})` });
   group.append(svgEl("rect", {
@@ -741,18 +688,6 @@ function symbolNode(child) {
   title.textContent = child.node.summary || child.node.name;
   group.append(title);
   return group;
-}
-
-function boxPoint(from, to) {
-  const cx = from.x + from.w / 2;
-  const cy = from.y + from.h / 2;
-  const dx = to.x + to.w / 2 - cx;
-  const dy = to.y + to.h / 2 - cy;
-  if (!dx && !dy) return { x: cx, y: cy };
-  const scaleX = dx === 0 ? Infinity : (from.w / 2) / Math.abs(dx);
-  const scaleY = dy === 0 ? Infinity : (from.h / 2) / Math.abs(dy);
-  const scale = Math.min(scaleX, scaleY);
-  return { x: cx + dx * scale, y: cy + dy * scale };
 }
 
 function clipText(text, max) {
@@ -786,7 +721,7 @@ function renderViewbar() {
   const hint = document.createElement("p");
   hint.className = "muted";
   hint.textContent = state.mode === "impact"
-    ? "每个文件是一个模块框，符号挂在模块里面。左边是影响到改动的模块，右边是改动影响到的模块。"
+    ? "方法画在所属类里面。同一起点的边先并成一条，再按终点分开，平行的边之间留出间隔。"
     : "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");

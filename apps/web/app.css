@@ -211,11 +211,13 @@ body.cmd #diff { cursor: pointer; }
 .impact svg { display: block; }
 .impact-module { fill: transparent; stroke: var(--line); }
 .impact-module.changed { stroke: var(--accent); }
+.impact-class { fill: transparent; stroke: var(--line); }
+.impact-class.changed { stroke: var(--accent); }
 .impact-node { fill: var(--fill); stroke: var(--line); }
 .impact-node.changed { fill: var(--add); stroke: var(--accent); }
 .impact-name { fill: var(--ink); font-size: 13px; }
 .impact-path { fill: var(--muted); font-size: 11px; }
-.impact-edge { stroke: var(--muted); fill: none; }
+.impact-edge { stroke: var(--muted); fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .impact-edge-label { fill: var(--muted); font-size: 11px; }
 .impact marker path { fill: var(--muted); }
 .source { margin: 0; padding: 12px; overflow: auto; background: var(--fill); }
