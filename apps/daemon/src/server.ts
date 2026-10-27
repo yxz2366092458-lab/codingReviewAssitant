@@ -35,7 +35,7 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
-import { checkoutBranch, listLocalBranches, startRef } from "./branches.ts";
+import { checkoutBranch, createBranch, listLocalBranches, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
@@ -266,6 +266,20 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
     }
     if (req.method === "GET" && rest === "branches") {
       sendJson(res, 200, { branches: await listLocalBranches(repo.path) });
+      return;
+    }
+    if (req.method === "POST" && rest === "branches") {
+      const body = await readJson(req);
+      const name = String(body.name ?? "");
+      const head = await headBranch(repo.path);
+      try {
+        await createBranch(repo.path, name, await branchBase(repo.path, repo.base_ref));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不能建立分支";
+        throw new GateError(message === "分支名无效" ? 400 : 409, message);
+      }
+      if ((await headBranch(repo.path)) !== head) throw new GateError(500, "新建分支不应切换当前检出");
+      sendJson(res, 200, { branch: name.trim() });
       return;
     }
     if (req.method === "POST" && rest === "branch") {
