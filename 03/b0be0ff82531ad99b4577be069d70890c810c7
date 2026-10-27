@@ -1,0 +1,23 @@
+apps/daemon/src/server.ts
+  s_e9de031bbb797a::t_41fcf05420bcdc 38
+  s_e9de031bbb797a::t_8592a3d35f3a5b 271-284
+test/create-branch.test.ts
+  s_e9de031bbb797a::t_2d598a7935cfe8 1-36,38-39,41,43-46,48-72
+  s_e9de031bbb797a::t_78a64e11238c34 37,40,42,47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "03b0be0ff82531ad99b4577be069d70890c810c7",
+  "prompts": {},
+  "sessions": {
+    "s_e9de031bbb797a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5a5be388-2664-47dd-a2b6-e18f16f5b43d",
+        "model": "grok-4.7"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
