@@ -1,0 +1,44 @@
+apps/web/app.js
+  s_fd528823e8d35d::t_f98792fef00401 1324-1327,1330
+test/explain.test.ts
+  s_fd528823e8d35d::t_ee3990667c9226 7-8
+  s_fd528823e8d35d::t_cb1764b1b9aca4 9
+  s_fd528823e8d35d::t_1a1662c22206c3 52-53
+  s_fd528823e8d35d::t_9536eb7085bb5a 207-211
+  s_fd528823e8d35d::t_ffe28f473bb521 197-206,212-314
+apps/daemon/src/explain.ts
+  s_fd528823e8d35d::t_47da88b0906ec9 302
+  s_fd528823e8d35d::t_a0acc0aea5013e 228,233-234,238-301,303-316
+  s_fd528823e8d35d::t_7fbe2d296a2e0e 317,566-631,645-646,648,650,653-680,682-683,685-686,711,720,722-726
+  s_fd528823e8d35d::t_199f1a7a861141 195-198,200,207
+  s_fd528823e8d35d::t_5c9e1bf996995f 318
+apps/daemon/src/cursor-proxy.ts
+  s_fd528823e8d35d::t_b22d14f451fcf6 257-268
+  s_fd528823e8d35d::t_d7563239e60dd3 285
+  s_fd528823e8d35d::t_53b59a125d64f4 200-204
+  s_fd528823e8d35d::t_513312bbf6a9ee 239-240
+  s_fd528823e8d35d::t_15aecd3942ec19 307
+test/cursor-proxy.test.ts
+  s_fd528823e8d35d::t_7dc651583e2dc3 43-79
+apps/daemon/src/server.ts
+  s_fd528823e8d35d::t_1dadf356391669 723-727
+  s_fd528823e8d35d::t_7765d86d89581d 636-638,641
+  s_fd528823e8d35d::t_d48ef4d0dc82d7 624
+  s_fd528823e8d35d::t_6061deb4b742ef 604-606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f59fc4bfeeb385197cddbc45958c6050c9e0f5c1",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
