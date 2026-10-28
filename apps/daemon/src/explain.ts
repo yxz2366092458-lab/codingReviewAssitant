@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { completePrompt } from "./summary-ai.ts";
+import type { AgentWrite } from "./cursor-proxy.ts";
+import { completePrompt, completeRun } from "./summary-ai.ts";
 
 export type CodeLine = {
   path: string;
@@ -143,12 +144,13 @@ export function sessionPrompt(history: ExplainTurn[], lines: CodeLine[], comment
 说明：
 用中文先说这些行共同完成的事，再按行说明各自的作用。
 
-修改时只输出：
+修改时只输出下面这一段，不要再另起一条只说已经修改。程序会把代码写入选中的当前文件。
 动作：修改
 说明：
 用中文写清选中代码要改成什么。
 代码：
 写出替换选中范围的完整代码，保留原有缩进。不要加围栏。
+答复时不要改文件。
 
 ${prior ? `同一会话里已经说过：\n${prior}\n\n` : ""}这次评论和选中的代码：
 ${userTurn(lines, comment)}`;
@@ -156,20 +158,107 @@ ${userTurn(lines, comment)}`;
 
 export function parseCommentAction(raw: string): CommentAction {
   const source = raw.trim();
-  const rows = source.split("\n");
-  const kind = rows[0] === "动作：答复" ? "reply" : rows[0] === "动作：修改" ? "edit" : "";
-  if (!kind || rows[1] !== "说明：") return { kind: "reply", text: source };
+  const normalized = unwrapFence(source.replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
+  const rows = normalized.split("\n");
+  const actionAt = rows.findIndex((row) => actionKind(row));
+  if (actionAt < 0) {
+    const fenced = singleFence(normalized);
+    if (fenced && /改成|改为|修改为|替换为/.test(normalized)) {
+      const text = normalized.replace(/```[^\n]*\n[\s\S]*?\n```/g, "").trim() || "已按评论替换选中代码。";
+      return { kind: "edit", text, code: fenced };
+    }
+    return { kind: "reply", text: source };
+  }
+  const kind = actionKind(rows[actionAt]);
+  let cursor = actionAt + 1;
+  while (cursor < rows.length && rows[cursor].trim() === "") cursor += 1;
+  if (!marker(rows[cursor] ?? "", "说明")) return { kind: "reply", text: source };
   if (kind === "reply") {
-    const text = rows.slice(2).join("\n").trim();
-    if (!text || rows.includes("代码：")) return { kind: "reply", text: source };
+    const body = rows.slice(cursor + 1);
+    const text = body.join("\n").trim();
+    if (!text || body.some((row) => marker(row, "代码"))) return { kind: "reply", text: source };
     return { kind: "reply", text };
   }
-  const codeAt = rows.indexOf("代码：");
-  if (codeAt < 3) return { kind: "reply", text: source };
-  const text = rows.slice(2, codeAt).join("\n").trim();
-  const code = rows.slice(codeAt + 1).join("\n").replace(/\s+$/, "");
+  const codeAt = rows.findIndex((row, index) => index > cursor && marker(row, "代码"));
+  if (codeAt < 0) {
+    const fenced = singleFence(rows.slice(cursor + 1).join("\n"));
+    const text = rows.slice(cursor + 1).join("\n").replace(/```[^\n]*\n[\s\S]*?\n```/g, "").trim();
+    if (text && fenced) return { kind: "edit", text, code: fenced };
+    return { kind: "reply", text: source };
+  }
+  const text = rows.slice(cursor + 1, codeAt).join("\n").trim();
+  const code = stripCodeFence(rows.slice(codeAt + 1).join("\n"));
   if (!text || !code.trim()) return { kind: "reply", text: source };
   return { kind: "edit", text, code };
+}
+
+function actionKind(line: string): "edit" | "reply" | "" {
+  const clean = line.trim().replace(/^\*+|\*+$/g, "").trim().replace(":", "：");
+  if (clean === "动作：修改") return "edit";
+  if (clean === "动作：答复") return "reply";
+  return "";
+}
+
+function marker(line: string, name: string): boolean {
+  return line.trim().replace(/^\*+|\*+$/g, "").trim().replace(":", "：") === `${name}：`;
+}
+
+function unwrapFence(source: string): string {
+  const match = /^```[^\n]*\n([\s\S]*?)\n```$/.exec(source.trim());
+  return match?.[1] ?? source;
+}
+
+function singleFence(source: string): string {
+  const matches = [...source.matchAll(/```[^\n]*\n([\s\S]*?)\n```/g)];
+  if (matches.length !== 1) return "";
+  return (matches[0]?.[1] ?? "").replace(/\s+$/, "");
+}
+
+function stripCodeFence(code: string): string {
+  const lines = code.replace(/\s+$/, "").split("\n");
+  if (lines[0]?.startsWith("```")) lines.shift();
+  if (lines[lines.length - 1]?.trim() === "```") lines.pop();
+  return lines.join("\n").replace(/\s+$/, "");
+}
+
+export function planFileEdits(action: CommentAction, raw: string, writes: AgentWrite[]): { edited: boolean; selection: boolean; writes: AgentWrite[] } {
+  const pending = writes.filter((item) => !item.applied && (item.contents !== undefined || (item.oldText !== undefined && item.newText !== undefined)));
+  if (writes.some((item) => item.applied)) return { edited: true, selection: false, writes: [] };
+  if (action.kind === "edit") return { edited: true, selection: true, writes: pending };
+  const structuredReply = /动作[:：]\s*答复/.test(raw) && !/动作[:：]\s*修改/.test(raw);
+  if (!structuredReply && pending.length && declaresChange(raw)) return { edited: true, selection: false, writes: pending };
+  return { edited: false, selection: false, writes: [] };
+}
+
+function declaresChange(text: string): boolean {
+  return /动作[:：]\s*修改|已修改|已经修改|已改|改好|改成|改为|修改为|替换为|已写入|I(?:'ve| have)? (?:updated|modified|changed)/i.test(text);
+}
+
+export function applyAgentWrites(root: string, writes: AgentWrite[]): string[] {
+  const changed: string[] = [];
+  for (const write of writes) {
+    if (write.applied) {
+      changed.push(write.path);
+      continue;
+    }
+    const full = fileInside(root, write.path);
+    if (typeof write.contents === "string") {
+      writeFileSync(full, write.contents);
+      changed.push(write.path);
+      continue;
+    }
+    if (typeof write.oldText !== "string" || typeof write.newText !== "string" || !write.oldText) continue;
+    let original = "";
+    try {
+      original = readFileSync(full, "utf8");
+    } catch {
+      throw new Error("文件不存在");
+    }
+    if (!original.includes(write.oldText)) throw new Error("选中的代码已经变了");
+    writeFileSync(full, original.replace(write.oldText, write.newText));
+    changed.push(write.path);
+  }
+  return changed;
 }
 
 export function applySelectionEdit(root: string, lines: CodeLine[], code: string): ExplainAnchor {
@@ -205,7 +294,10 @@ function fileInside(root: string, filePath: string): string {
 }
 
 function sameLine(fileLine: string, sent: string): boolean {
-  return fileLine === sent || (fileLine === "" && sent === " ");
+  const left = fileLine.replace(/\r$/, "");
+  const right = sent.replace(/\r$/, "");
+  if (left === right || (left === "" && right === " ")) return true;
+  return right.startsWith(" ") && right.slice(1) === left;
 }
 
 export function remember(key: string, history: ExplainTurn[], lines: CodeLine[], comment: string, reply: string): ExplainTurn[] {
@@ -393,30 +485,63 @@ export async function explainInSession(
   comment: string,
   anchor?: ExplainAnchor,
   root = "",
-): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor }> {
+): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor; edited: boolean; edit: { path: string; start: number; end: number; code: string } | null }> {
   if (!lines.length) throw new Error("先选中代码行");
   const target = anchor ?? anchorFor(lines);
   if (!target) throw new Error("请选择同一侧连续的代码行");
   const history = loadThread(db, repoId, sessionId, target);
-  let reply = "";
+  let run: { text: string; writes: AgentWrite[] } = { text: "", writes: [] };
   try {
-    reply = (await completePrompt(sessionPrompt(history, lines, comment))).trim();
+    run = await completeRun(sessionPrompt(history, lines, comment), true, root);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "总结失败" || message === "总结为空") throw new Error("解释失败");
     throw error;
   }
-  if (!reply) throw new Error("解释失败");
-  const action = parseCommentAction(reply);
-  const shown = action.text.trim();
-  if (!shown) throw new Error("解释失败");
-  if (action.kind === "edit") {
+  const reply = run.text.trim();
+  if (!reply && run.writes.length === 0) throw new Error("解释失败");
+  const action = reply ? parseCommentAction(reply) : { kind: "reply" as const, text: "" };
+  let shown = action.text.trim();
+  const plan = planFileEdits(action, reply, run.writes);
+  let edit: { path: string; start: number; end: number; code: string } | null = null;
+  if (plan.selection) {
     if (!root) throw new Error("不能修改代码");
-    applySelectionEdit(root, lines, action.code);
+    if (action.kind !== "edit") throw new Error("不能修改代码");
+    try {
+      const applied = applySelectionEdit(root, lines, action.code);
+      edit = { path: applied.path, start: applied.start, end: applied.end, code: action.code };
+    } catch (error) {
+      if (selectionAlreadyApplied(root, lines, action.code)) {
+        edit = { path: target.path, start: target.start, end: target.end, code: action.code };
+      } else if (!plan.writes.length && !run.writes.some((item) => item.applied)) {
+        throw error;
+      }
+    }
   }
+  if (!edit && plan.writes.length) {
+    if (!root) throw new Error("不能修改代码");
+    const paths = applyAgentWrites(root, plan.writes);
+    if (paths[0]) edit = { path: paths[0], start: 0, end: 0, code: "" };
+  } else if (!edit && plan.edited) {
+    const path = run.writes.find((item) => item.applied)?.path ?? run.writes[0]?.path ?? "";
+    if (path) edit = { path, start: 0, end: 0, code: "" };
+  }
+  if (plan.edited && !shown) shown = "已写入文件。";
+  if (!shown) throw new Error("解释失败");
   const turns = [...history, { role: "user" as const, content: userTurn(lines, comment) }, { role: "assistant" as const, content: shown }].slice(-12);
   saveThread(db, repoId, sessionId, target, turns);
-  return { reply: shown, turns, anchor: target };
+  return { reply: shown, turns, anchor: target, edited: plan.edited, edit };
+}
+
+function selectionAlreadyApplied(root: string, lines: CodeLine[], code: string): boolean {
+  const group = selectionAnchors(lines)[0];
+  const snippet = code.trim();
+  if (!group || !snippet) return false;
+  try {
+    return readFileSync(fileInside(root, group.path), "utf8").includes(snippet);
+  } catch {
+    return false;
+  }
 }
 
 export async function explainSelection(

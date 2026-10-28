@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { FileChange, FileStatus } from "../../../packages/protocol/src/index.ts";
-import { cursorProxyTarget } from "./cursor-proxy.ts";
+import { cursorProxyTarget, type AgentWrite } from "./cursor-proxy.ts";
 import { summarizeFile } from "./summary.ts";
 
 const statusLabel: Record<FileStatus, string> = {
@@ -56,7 +56,7 @@ export async function summarizeDiff(file: FileChange, patch: string): Promise<st
   const running = pending.get(key);
   if (running) return running;
   const task = ask(summaryPrompt(file, patch))
-    .then((text) => {
+    .then(({ text }) => {
       const clean = text.trim();
       if (!clean) return summarizeFile(file, patch);
       if (cache.size > 80) cache.clear();
@@ -79,10 +79,35 @@ function collectText(value: unknown, parts: string[]): void {
 }
 
 export async function completePrompt(prompt: string): Promise<string> {
-  return ask(prompt);
+  return (await ask(prompt)).text;
 }
 
-async function ask(prompt: string): Promise<string> {
+export async function completeRun(prompt: string, write = false, repoPath = ""): Promise<{ text: string; writes: AgentWrite[] }> {
+  return ask(prompt, write, repoPath);
+}
+
+export function responseWrites(payload: unknown): AgentWrite[] {
+  if (!payload || typeof payload !== "object") return [];
+  const writes = (payload as { writes?: unknown }).writes;
+  if (!Array.isArray(writes)) return [];
+  const parsed: AgentWrite[] = [];
+  for (const item of writes) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const path = typeof record.path === "string" ? record.path : "";
+    if (!path) continue;
+    parsed.push({
+      path,
+      contents: typeof record.contents === "string" ? record.contents : undefined,
+      oldText: typeof record.oldText === "string" ? record.oldText : undefined,
+      newText: typeof record.newText === "string" ? record.newText : undefined,
+      applied: record.applied === true,
+    });
+  }
+  return parsed;
+}
+
+async function ask(prompt: string, write = false, repoPath = ""): Promise<{ text: string; writes: AgentWrite[] }> {
   const target = cursorProxyTarget();
   const response = await fetch(`${target.url}/responses`, {
     method: "POST",
@@ -90,7 +115,7 @@ async function ask(prompt: string): Promise<string> {
       authorization: `Bearer ${target.token}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ model: "cursor", input: prompt, store: false }),
+    body: JSON.stringify({ model: "cursor", input: prompt, write, repoPath, store: false }),
     signal: AbortSignal.timeout(100_000),
   });
   if (!response.ok) {
@@ -103,7 +128,9 @@ async function ask(prompt: string): Promise<string> {
     }
     throw new Error(message);
   }
-  const text = responseText(await response.json());
-  if (!text) throw new Error("总结为空");
-  return text;
+  const payload = await response.json();
+  const text = responseText(payload);
+  const writes = responseWrites(payload);
+  if (!text && writes.length === 0) throw new Error("总结为空");
+  return { text, writes };
 }

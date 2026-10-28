@@ -22,6 +22,10 @@ const state = {
   viewSession: "",
   loadedExplainSession: "",
   sessions: [],
+  branchQuery: "",
+  branchChoice: "",
+  branchNames: [],
+  appliedEdit: null,
 };
 
 let events = null;
@@ -167,6 +171,10 @@ function resetView() {
   state.viewSession = "";
   state.loadedExplainSession = "";
   state.sessions = [];
+  state.branchQuery = "";
+  state.branchChoice = "";
+  state.branchNames = [];
+  state.appliedEdit = null;
   $("source").hidden = true;
   $("diff").replaceChildren();
   connect();
@@ -229,7 +237,7 @@ async function loadPanel() {
     purpose: gate.slice?.purpose,
     finalRound: gate.finalRound,
     phase: gate.phase,
-    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
+    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}:${file.status}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
     requirement: status.requirement,
@@ -283,19 +291,17 @@ function renderSummary(gate) {
   phase.classList.toggle("development", gate.phase === "development");
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
+  const typingBranch = document.activeElement instanceof HTMLInputElement && document.activeElement.id === "branch-search";
+  const branchCaret = typingBranch ? document.activeElement.selectionStart : null;
   decisions.replaceChildren();
   const show = gate.state === "awaiting_release" || gate.state === "awaiting_review";
   wrap.hidden = !show;
   if (!show || !slice) return;
   if (gate.state === "awaiting_review") {
-    const select = document.createElement("select");
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "选择分支";
-    select.append(placeholder);
-    decisions.append(select);
-    decisions.append(decision("核验通过", () => verify(slice.sliceId, select)));
-    void fillBranches(select).catch(showError);
+    const picker = renderBranchPicker(typingBranch, branchCaret);
+    decisions.append(picker);
+    decisions.append(decision("核验通过", () => verify(slice.sliceId, picker.querySelector("select"))));
+    void fillBranches(picker.querySelector("select")).catch(showError);
   } else {
     const primary = gate.phase === "requirement" ? "需求准入" : "放行";
     decisions.append(decision(primary, () => act("release", slice.sliceId)));
@@ -330,17 +336,56 @@ async function act(name, sliceId) {
   await refresh();
 }
 
-async function fillBranches(select) {
-  const { branches } = await api(`/repos/${state.repoId}/branches`);
-  if (!select.isConnected) return;
-  const chosen = select.value;
-  for (const name of branches) {
+function renderBranchPicker(wasTyping, caret) {
+  const picker = document.createElement("div");
+  picker.className = "branch-picker";
+  const search = document.createElement("input");
+  search.id = "branch-search";
+  search.type = "search";
+  search.placeholder = "搜索分支";
+  search.spellcheck = false;
+  search.autocomplete = "off";
+  search.value = state.branchQuery;
+  const select = document.createElement("select");
+  select.addEventListener("change", () => {
+    state.branchChoice = select.value;
+  });
+  search.addEventListener("input", () => {
+    state.branchQuery = search.value;
+    renderBranchOptions(select);
+  });
+  picker.append(search, select);
+  renderBranchOptions(select);
+  if (wasTyping) {
+    search.focus();
+    if (caret !== null) search.setSelectionRange(caret, caret);
+  }
+  return picker;
+}
+
+function renderBranchOptions(select) {
+  const query = state.branchQuery.trim().toLowerCase();
+  const chosen = state.branchChoice;
+  const names = state.branchNames.filter((name) => name.toLowerCase().includes(query));
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = query && names.length === 0 ? "没有匹配的分支" : "选择分支";
+  select.append(placeholder);
+  for (const name of names) {
     const option = document.createElement("option");
     option.value = name;
     option.textContent = name;
     select.append(option);
   }
-  if (branches.includes(chosen)) select.value = chosen;
+  select.value = names.includes(chosen) ? chosen : "";
+}
+
+async function fillBranches(select) {
+  const { branches } = await api(`/repos/${state.repoId}/branches`);
+  if (!select?.isConnected) return;
+  state.branchNames = branches ?? [];
+  renderBranchOptions(select);
 }
 
 let verifying = false;
@@ -354,17 +399,21 @@ async function verify(sliceId, select) {
   }
   verifying = true;
   select.disabled = true;
-  for (const button of $("decisions").querySelectorAll("button")) button.disabled = true;
+  for (const field of $("decisions").querySelectorAll("button, input, select")) field.disabled = true;
   try {
     await api(`/repos/${state.repoId}/gate/ack`, {
       method: "POST",
       body: JSON.stringify({ sliceId, branch }),
     });
     state.sliceId = "";
+    state.branchChoice = "";
+    state.branchQuery = "";
     await refresh();
   } finally {
     verifying = false;
-    if (select.isConnected) select.disabled = false;
+    if (select.isConnected) {
+      for (const field of $("decisions").querySelectorAll("button, input, select")) field.disabled = false;
+    }
   }
 }
 
@@ -414,6 +463,7 @@ async function renderPatch() {
   if (state.mode === "unified") diff.append(unified(patch));
   else diff.append(split(patch));
   paintPicked();
+  paintAppliedEdit();
   placeExplainBars();
 }
 
@@ -889,6 +939,29 @@ function rememberThread(result, group) {
   if (result.sessionId) state.loadedExplainSession = result.sessionId;
 }
 
+function paintAppliedEdit() {
+  const edit = state.appliedEdit;
+  if (!edit?.path) return;
+  const rows = [...document.querySelectorAll("#diff .line")].filter((row) => row.dataset.path === edit.path && row.dataset.side === "head");
+  if (edit.code && edit.start) {
+    const lines = String(edit.code).replace(/\s+$/, "").split("\n");
+    const selected = rows.filter((row) => {
+      const line = Number(row.dataset.line);
+      return line >= edit.start && line <= edit.end;
+    });
+    selected.forEach((row, index) => {
+      const code = row.querySelector("span:last-child");
+      if (!code) return;
+      if (index === selected.length - 1 && lines.length > selected.length) code.textContent = lines.slice(index).join("\n") || " ";
+      else code.textContent = lines[index] ?? " ";
+    });
+  }
+  const filePath = $("file-path");
+  if (filePath.textContent.startsWith(edit.path) && !filePath.textContent.includes("已写入工作区")) {
+    filePath.textContent = `${filePath.textContent} · 已写入工作区`;
+  }
+}
+
 function explainPending() {
   const row = document.createElement("p");
   row.className = "explain-pending";
@@ -929,7 +1002,14 @@ async function sendComment(group, text) {
     rememberThread(result, group);
     delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
-    placeExplainBars();
+    if (result.edited) {
+      state.appliedEdit = result.edit?.path ? result.edit : { path: group.path, start: group.start, end: group.end, code: "" };
+      showNotice(state.appliedEdit.path ? `已写入 ${state.appliedEdit.path}` : "已写入工作区");
+      state.signature = "";
+      await refresh();
+    } else {
+      placeExplainBars();
+    }
   } catch (error) {
     delete state.pendingExplain[key];
     placeExplainBars();
