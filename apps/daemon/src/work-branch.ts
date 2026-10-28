@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { assertBranchName, checkoutBranch, createBranch, listLocalBranches, mergeBranch, mergeFastForward, renameBranch } from "./branches.ts";
+import { assertBranchName, checkoutBranch, commitsAhead, createBranch, listLocalBranches, mergeBranch, mergeFastForward, renameBranch } from "./branches.ts";
 
 export function workBranchNames(title: string): { requirement: string; development: string } {
   const slug = title.trim().replace(/\s+/g, "-").replace(/\./g, "").slice(0, 48);
@@ -12,6 +12,25 @@ export function workBranchNames(title: string): { requirement: string; developme
 
 export function sessionSlug(sessionId: string): string {
   return sessionId.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, 16);
+}
+
+export function developmentSlug(branch: string): string | null {
+  const match = /^dev\/([A-Za-z0-9]{8,})$/.exec(branch.trim());
+  return match?.[1] ?? null;
+}
+
+export function unmatchedBranchMessage(branch: string, mergedInto = ""): string {
+  const name = branch.trim() || "当前分支";
+  if (name.startsWith("cursor/")) {
+    if (mergedInto) {
+      return `分支「${name}」还没有认领到需求会话。可以先认领，再走需求分支合并；这次只把它并进了「${mergedInto}」，没有动其他会话。`;
+    }
+    return `分支「${name}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`;
+  }
+  if (mergedInto) {
+    return `分支「${name}」没有对应的需求会话，已将该分支合并到「${mergedInto}」，没有动其他会话。`;
+  }
+  return `分支「${name}」没有对应的需求会话，没有合并。未登记的开发分支不会并入其他会话。`;
 }
 
 export function sessionBranchNames(sessionId: string, summary: string): { requirement: string; development: string } {
@@ -96,8 +115,7 @@ function firstUserAsk(sessionId: string): string {
 
 export class UnmatchedWorkBranchError extends Error {
   constructor(branch: string) {
-    const name = branch.trim() || "当前分支";
-    super(`分支「${name}」没有对应的需求会话，没有合并。未登记的开发分支不会并入其他会话。`);
+    super(unmatchedBranchMessage(branch));
     this.name = "UnmatchedWorkBranchError";
   }
 }
@@ -203,9 +221,69 @@ export function readSessionBranches(
   repoId: string,
   sessionId: string,
 ): { requirement: string; development: string } | null {
-  const match = listWorkSessions(db, repoId, "").find((item) => item.sessionId === sessionId.trim());
+  const match = listWorkSessions(db, repoId, "").find((item) => sameSession(item.sessionId, sessionId));
   if (!match) return null;
   return { requirement: match.requirement, development: match.development };
+}
+
+export async function claimWorkBranch(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  branch: string,
+  sessionId = "",
+  knownSummary?: string,
+): Promise<{ sessionId: string; requirement: string; development: string }> {
+  const name = assertBranchName(branch);
+  if (!(await listLocalBranches(cwd)).includes(name)) throw new Error("没有这个本地分支");
+  const branchSlug = developmentSlug(name);
+  const provided = sessionId.trim();
+  let owner = "";
+  if (branchSlug && !provided) owner = branchSlug;
+  else if (!provided) throw new Error("请选择或建立会话后再认领这个分支");
+  else if (sessionSlug(provided).length < 8) throw new Error("会话无效");
+  else owner = provided;
+  ensureWorkBranches(db);
+  const existingDev = readWorkBranches(db, repoId, name);
+  if (existingDev) {
+    return {
+      sessionId: currentSessionId(db, repoId, name),
+      requirement: existingDev.requirement,
+      development: existingDev.development,
+    };
+  }
+  const existingSession = readSessionBranches(db, repoId, owner);
+  if (existingSession && existingSession.development !== name) throw new Error("这条会话已经绑定了别的开发分支");
+  if (existingSession) return { sessionId: owner, requirement: existingSession.requirement, development: name };
+  const slugHint = branchSlug || sessionSlug(owner);
+  const summary = knownSummary ?? (provided ? readSessionSummary(provided) : summaryForSlug(slugHint));
+  const requirement = await ensureClaimRequirement(db, cwd, repoId, name, slugHint, summary);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    repoId,
+    owner,
+    requirement,
+    name,
+  );
+  return { sessionId: owner, requirement, development: name };
+}
+
+export async function listUnclaimedBranches(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+): Promise<Array<{ branch: string; kind: "dev" | "cursor" }>> {
+  ensureWorkBranches(db);
+  const rows = db.prepare("SELECT development FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{
+    development: string;
+  }>;
+  const claimed = new Set(rows.map((row) => row.development));
+  const unclaimed: Array<{ branch: string; kind: "dev" | "cursor" }> = [];
+  for (const branch of await listLocalBranches(cwd)) {
+    if (claimed.has(branch)) continue;
+    if (branch.startsWith("dev/")) unclaimed.push({ branch, kind: "dev" });
+    else if (branch.startsWith("cursor/")) unclaimed.push({ branch, kind: "cursor" });
+  }
+  return unclaimed;
 }
 
 export function currentSessionId(db: DatabaseSync, repoId: string, headBranch: string): string {
@@ -302,6 +380,98 @@ export async function repairSessionRequirements(
     branches.add(next);
     db.prepare("UPDATE work_branches SET requirement = ? WHERE repo_id = ? AND session_id = ?").run(next, repoId, row.session_id);
   }
+}
+
+function sameSession(stored: string, asked: string): boolean {
+  const left = stored.trim();
+  const right = asked.trim();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const storedSlug = sessionSlug(left);
+  const askedSlug = sessionSlug(right);
+  return storedSlug.length >= 8 && storedSlug === askedSlug;
+}
+
+function summaryForSlug(slug: string): string {
+  const id = sessionIdForSlug(slug);
+  return id ? readSessionSummary(id) : "";
+}
+
+function sessionIdForSlug(slug: string, file = cursorStateFile()): string {
+  const target = slug.trim();
+  if (target.length < 8 || !existsSync(file)) return "";
+  let db: DatabaseSync | null = null;
+  try {
+    db = new DatabaseSync(file, { readOnly: true });
+    const rows = db.prepare("SELECT composerId FROM composerHeaders").all() as Array<{ composerId?: string }>;
+    for (const row of rows) {
+      const id = String(row.composerId ?? "");
+      if (id === target || sessionSlug(id) === target) return id;
+    }
+    return "";
+  } catch {
+    return "";
+  } finally {
+    db?.close();
+  }
+}
+
+async function ensureClaimRequirement(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  development: string,
+  slugHint: string,
+  summary: string,
+): Promise<string> {
+  ensureWorkBranches(db);
+  const locals = await listLocalBranches(cwd);
+  const rows = db.prepare("SELECT requirement FROM work_branches WHERE repo_id = ?").all(repoId) as Array<{
+    requirement: string;
+  }>;
+  const used = new Set(rows.map((row) => row.requirement));
+  if (slugHint.length >= 8) {
+    const exact = `req/${slugHint}`;
+    if (locals.includes(exact) && !used.has(exact) && (await commitsAhead(cwd, exact, development)) !== null) return exact;
+  }
+  const closest = await uniqueClosestRequirement(
+    cwd,
+    development,
+    locals.filter((item) => item.startsWith("req/") && !used.has(item)),
+  );
+  if (closest) return closest;
+  let desired = "";
+  if (summary.trim()) {
+    try {
+      desired = requirementBranchName(summary);
+    } catch {
+      desired = "";
+    }
+  }
+  if (!desired && slugHint) desired = `req/${slugHint.slice(0, 48)}`;
+  if (!desired) throw new Error("没有会话总结");
+  const requirement = await availableRequirement(db, cwd, repoId, desired);
+  if (!locals.includes(requirement)) await createBranch(cwd, requirement, development);
+  return requirement;
+}
+
+async function uniqueClosestRequirement(cwd: string, development: string, candidates: string[]): Promise<string> {
+  let best = "";
+  let bestAhead = Number.POSITIVE_INFINITY;
+  let tied = false;
+  for (const candidate of candidates) {
+    if (candidate === development) continue;
+    const ahead = await commitsAhead(cwd, candidate, development);
+    if (ahead === null) continue;
+    if (ahead < bestAhead) {
+      best = candidate;
+      bestAhead = ahead;
+      tied = false;
+    } else if (ahead === bestAhead) {
+      tied = true;
+    }
+  }
+  return tied ? "" : best;
 }
 
 async function availableRequirement(db: DatabaseSync, cwd: string, repoId: string, name: string): Promise<string> {

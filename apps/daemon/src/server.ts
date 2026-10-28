@@ -35,12 +35,12 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
-import { checkoutBranch, createBranch, listLocalBranches, mergeBranch, startRef } from "./branches.ts";
+import { checkoutBranch, createBranch, listBranchCandidates, listLocalBranches, materializeBranch, mergeBranch, startRef, trackOriginBranch } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession, type ExplainProgress } from "./explain.ts";
-import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase, UnmatchedWorkBranchError } from "./work-branch.ts";
+import { admitSession, bindMergeTarget, claimWorkBranch, currentSessionId, developmentSlug, listUnclaimedBranches, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase, sessionSlug, unmatchedBranchMessage, UnmatchedWorkBranchError } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -279,13 +279,33 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
         requirement: pair?.requirement ?? null,
         development: pair?.development ?? null,
         mergeTarget: readMergeTarget(db, repo.id, status.branch) || null,
+        unclaimed: await listUnclaimedBranches(db, repo.path, repo.id),
         gate: view.state,
         lease: view.lease,
       });
       return;
     }
     if (req.method === "GET" && rest === "branches") {
-      sendJson(res, 200, { branches: await listLocalBranches(repo.path) });
+      try {
+        sendJson(res, 200, await listBranchCandidates(repo.path, url.searchParams.get("refresh") === "1"));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "拉不到远端分支";
+        throw new GateError(409, message);
+      }
+      return;
+    }
+    if (req.method === "POST" && rest === "branches/track") {
+      const body = await readJson(req);
+      const head = await headBranch(repo.path);
+      try {
+        const branch = await trackOriginBranch(repo.path, String(body.name ?? ""));
+        if ((await headBranch(repo.path)) !== head) throw new GateError(500, "跟踪分支不应切换当前检出");
+        sendJson(res, 200, { branch });
+      } catch (error) {
+        if (error instanceof GateError) throw error;
+        const message = error instanceof Error ? error.message : "不能跟踪远端分支";
+        throw new GateError(message === "分支名无效" ? 400 : 409, message);
+      }
       return;
     }
     if (req.method === "POST" && rest === "branches") {
@@ -321,6 +341,25 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       const pair = await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, repo.base_ref), String(body.name ?? ""));
       publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, pair);
+      return;
+    }
+    if (req.method === "POST" && rest === "work-branches/claim") {
+      const body = await readJson(req);
+      try {
+        const claimed = await claimWorkBranch(
+          db,
+          repo.path,
+          repo.id,
+          String(body.branch ?? ""),
+          String(body.sessionId ?? ""),
+        );
+        publish(repo.id, await headBranch(repo.path));
+        sendJson(res, 200, claimed);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不能认领这个分支";
+        const status = message === "分支名无效" || message === "会话无效" ? 400 : 409;
+        throw new GateError(status, message);
+      }
       return;
     }
     if (req.method === "POST" && rest === "base") {
@@ -363,11 +402,20 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       if (!gateView(db, repo.id, head).slice) {
         const session = String(body.session ?? "").trim();
         if (session) {
-          if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
-            throw new GateError(400, "没有会话总结");
+          const recorded = readSessionBranches(db, repo.id, session);
+          const byHead = readWorkBranches(db, repo.id, head);
+          const slug = developmentSlug(head);
+          if (recorded) {
+            await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
+            head = await headBranch(repo.path);
+          } else if (!byHead && slug) {
+            const attached = sessionSlug(session) === slug || session === slug ? session : "";
+            await claimWorkBranch(db, repo.path, repo.id, head, attached);
+          } else if (!byHead) {
+            if (!readSessionSummary(session)) throw new GateError(400, "没有会话总结");
+            await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
+            head = await headBranch(repo.path);
           }
-          await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
-          head = await headBranch(repo.path);
         }
       }
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""), head);
@@ -388,7 +436,8 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       const body = await readJson(req);
       const head = await headBranch(repo.path);
       try {
-        const mergeTarget = await bindMergeTarget(db, repo.path, repo.id, head, String(body.branch ?? ""));
+        const branch = await materializeBranch(repo.path, String(body.branch ?? ""));
+        const mergeTarget = await bindMergeTarget(db, repo.path, repo.id, head, branch);
         publish(repo.id, head);
         sendJson(res, 200, { mergeTarget });
       } catch (error) {
@@ -436,7 +485,9 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
             console.error(`核对通过未合并：${message}`);
             throw new GateError(409, message);
           }
-          mergeNote = `分支「${branchName}」没有对应的需求会话，已将该分支合并到「${branch}」，没有动其他会话。`;
+          mergeNote = unmatchedBranchMessage(branchName, branch);
+        } else if (branchName.startsWith("cursor/")) {
+          mergeNote = unmatchedBranchMessage(branchName);
         } else {
           mergeNote = branch ? `${error.message}选择的「${branch}」没有写入。` : error.message;
         }

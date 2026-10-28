@@ -75,6 +75,9 @@ button.decision { min-width: 96px; }
   width: 220px;
 }
 .work-branches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.unclaimed-note { margin: 4px 0 0; color: var(--muted); max-width: 520px; }
+.unclaimed-row { display: flex; gap: 8px; align-items: center; flex-basis: 100%; }
+.unclaimed-row p { margin: 0; color: var(--muted); }
 .work-branches strong {
   font-weight: 650;
   background: var(--fill);

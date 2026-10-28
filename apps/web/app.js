@@ -29,6 +29,9 @@ const state = {
   branchQuery: "",
   branchChoice: "",
   branchNames: [],
+  remoteOnly: [],
+  branchesLoaded: false,
+  unclaimed: [],
   appliedEdit: null,
 };
 
@@ -102,8 +105,57 @@ function repoLabel(repo, repos) {
 }
 
 function renderWorkBranches(status) {
-  $("requirement-branch").textContent = status.requirement || "未建立";
-  $("development-branch").textContent = status.development || "未建立";
+  const requirement = $("requirement-branch");
+  const development = $("development-branch");
+  const claim = $("claim-branch");
+  const note = $("unclaimed-note");
+  requirement.textContent = status.requirement || "未建立";
+  development.textContent = status.development || "未建立";
+  claim.hidden = true;
+  note.hidden = true;
+  note.textContent = "";
+  if (status.requirement || status.development) return;
+  const head = status.branch || "";
+  const item = (status.unclaimed ?? state.unclaimed).find((entry) => entry.branch === head);
+  if (!item) return;
+  development.textContent = head;
+  claim.hidden = false;
+  claim.onclick = () => void claimBranch(head).catch(showError);
+  if (item.kind === "dev") {
+    requirement.textContent = "未认领";
+    return;
+  }
+  note.hidden = false;
+  note.textContent = `分支「${head}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`;
+}
+
+async function claimBranch(branch) {
+  const automatic = /^dev\/[A-Za-z0-9]{8,}$/.test(branch);
+  let sessionId = "";
+  if (!automatic) {
+    const known = state.sessions.map((item) => `${item.development}（${item.sessionId}）`).join("，");
+    const hint = branch.startsWith("cursor/")
+      ? "可以认领到一条会话，或在核对通过时只并进所选目标。"
+      : "请填写要绑定的会话编号。";
+    const typed = window.prompt(`${hint}${known ? `\n已有会话：${known}` : ""}\n会话编号`, "");
+    if (typed === null) return;
+    sessionId = typed.trim();
+    if (!sessionId) {
+      showNotice(
+        branch.startsWith("cursor/")
+          ? `分支「${branch}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`
+          : "请选择或建立会话后再认领这个分支。",
+      );
+      return;
+    }
+  }
+  await api(`/repos/${state.repoId}/work-branches/claim`, {
+    method: "POST",
+    body: JSON.stringify(sessionId ? { branch, sessionId } : { branch }),
+  });
+  showNotice(`已认领 ${branch}`);
+  state.signature = "";
+  await refresh();
 }
 
 function shownBranches(status) {
@@ -182,6 +234,9 @@ function resetView() {
   state.branchQuery = "";
   state.branchChoice = "";
   state.branchNames = [];
+  state.remoteOnly = [];
+  state.branchesLoaded = false;
+  state.unclaimed = [];
   state.appliedEdit = null;
   $("source").hidden = true;
   $("diff").replaceChildren();
@@ -263,6 +318,7 @@ async function loadPanel() {
     api(`/repos/${state.repoId}/sessions`),
   ]);
   state.sessions = sessionPage.sessions ?? [];
+  state.unclaimed = status.unclaimed ?? [];
   const active = activeSessionId(sessionPage);
   const signature = JSON.stringify({
     gate: gate.state,
@@ -276,6 +332,8 @@ async function loadPanel() {
     mode: state.mode,
     requirement: status.requirement,
     development: status.development,
+    branch: status.branch,
+    unclaimed: (status.unclaimed ?? []).map((item) => `${item.kind}:${item.branch}`).join(","),
     mergeTarget: status.mergeTarget ?? gate.mergeTarget ?? "",
     historyPage: slices.page,
     history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
@@ -460,7 +518,7 @@ function renderBranchOptions(select) {
   for (const name of names) {
     const option = document.createElement("option");
     option.value = name;
-    option.textContent = name;
+    option.textContent = name.startsWith("origin/") ? `${name}（远端）` : name;
     select.append(option);
   }
   if (query && !state.branchNames.includes(query)) {
@@ -474,9 +532,20 @@ function renderBranchOptions(select) {
 }
 
 async function fillBranches(select, preferred = "") {
-  const { branches } = await api(`/repos/${state.repoId}/branches`);
+  const refresh = !state.branchesLoaded;
+  let payload;
+  try {
+    payload = await api(`/repos/${state.repoId}/branches${refresh ? "?refresh=1" : ""}`);
+    state.branchesLoaded = true;
+  } catch (error) {
+    if (!refresh) throw error;
+    payload = await api(`/repos/${state.repoId}/branches`);
+    state.branchesLoaded = true;
+    showNotice("远端分支暂时拉不下来，先显示本机已有的分支。");
+  }
   if (!select?.isConnected) return;
-  state.branchNames = branches ?? [];
+  state.branchNames = payload.branches ?? [];
+  state.remoteOnly = payload.remoteOnly ?? [];
   if (!state.branchChoice && preferred && state.branchNames.includes(preferred)) {
     state.branchChoice = preferred;
   }
@@ -490,6 +559,20 @@ async function ensureBranch(select) {
     branch = state.branchQuery.trim();
   }
   if (!branch) return "";
+  if (branch.startsWith("origin/")) {
+    const tracked = await api(`/repos/${state.repoId}/branches/track`, {
+      method: "POST",
+      body: JSON.stringify({ name: branch }),
+    });
+    branch = tracked.branch;
+    state.remoteOnly = state.remoteOnly.filter((item) => item !== `origin/${branch}`);
+    if (!state.branchNames.includes(branch)) state.branchNames = [...state.branchNames, branch];
+    state.branchChoice = branch;
+    state.branchQuery = branch;
+    renderBranchOptions(select);
+    select.value = branch;
+    return branch;
+  }
   if (!state.branchNames.includes(branch)) {
     await api(`/repos/${state.repoId}/branches`, {
       method: "POST",
@@ -1422,7 +1505,7 @@ function identifierFrom(event) {
 function renderSessions(active) {
   const box = $("sessions");
   box.replaceChildren();
-  if (state.sessions.length === 0) {
+  if (state.sessions.length === 0 && state.unclaimed.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty";
     empty.textContent = "还没有可以回看的会话。";
@@ -1437,6 +1520,26 @@ function renderSessions(active) {
     button.classList.toggle("active", item.sessionId === active);
     button.addEventListener("click", () => openSession(item));
     box.append(button);
+  }
+  for (const item of state.unclaimed) {
+    if (item.kind === "dev") {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `${item.branch} · 未认领`;
+      button.addEventListener("click", () => void claimBranch(item.branch).catch(showError));
+      box.append(button);
+      continue;
+    }
+    const row = document.createElement("div");
+    row.className = "unclaimed-row";
+    const text = document.createElement("p");
+    text.textContent = `分支「${item.branch}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "认领";
+    button.addEventListener("click", () => void claimBranch(item.branch).catch(showError));
+    row.append(text, button);
+    box.append(row);
   }
 }
 
