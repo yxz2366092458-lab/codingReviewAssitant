@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
-import { admitSession, composerName, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { commitTrackedEdits, mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
+import { admitSession, composerName, currentSessionId, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readWorkBranches, sessionBranchNames, sessionPhase, UnmatchedWorkBranchError, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
@@ -89,6 +89,26 @@ test("已有会话编号的需求分支改成会话总结", async () => {
   assert.doesNotMatch(branches, /req\/fdea6284fcb149cb/);
 });
 
+test("核验前先提交评论改过的文件，再切分支", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-commit-edits-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "req/demo"]);
+  git(cwd, ["switch", "-c", "dev/demo"]);
+  writeFileSync(join(cwd, "a.txt"), "changed\n");
+  writeFileSync(join(cwd, "note.txt"), "untracked\n");
+  assert.equal(await commitTrackedEdits(cwd, "采纳评审评论中的修改。"), true);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd }).toString(), "?? note.txt\n");
+  assert.match(execFileSync("git", ["log", "-1", "--format=%s"], { cwd }).toString(), /采纳评审评论中的修改/);
+  assert.equal(execFileSync("git", ["show", "HEAD:a.txt"], { cwd }).toString(), "changed\n");
+  await mergeFastForward(cwd, "req/demo", "dev/demo");
+  assert.equal(execFileSync("git", ["show", "req/demo:a.txt"], { cwd }).toString(), "changed\n");
+});
+
 test("需求名分成需求分支和开发分支", () => {
   assert.deepEqual(workBranchNames("登记多个工程"), {
     requirement: "req/登记多个工程",
@@ -151,7 +171,7 @@ test("停在其他分支时，核对通过仍把开发分支合进需求分支",
     "req/demo",
     "dev/demo",
   );
-  await mergeWorkBranches(db, cwd, "repo", "main");
+  await mergeWorkBranches(db, cwd, "repo", "dev/demo");
   const requirement = execFileSync("git", ["rev-parse", "req/demo"], { cwd }).toString().trim();
   const development = execFileSync("git", ["rev-parse", "dev/demo"], { cwd }).toString().trim();
   const current = execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim();
@@ -180,6 +200,7 @@ test("第一轮放行是需求准入，之后的新段是开发过程", () => {
   admitSession(db, "repo", "dev/demo", "slice-1");
   assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-1"), "requirement");
   assert.equal(sessionPhase(db, "repo", "dev/demo", "slice-2"), "development");
+  assert.equal(sessionPhase(db, "repo", "feature-api", "slice-2"), null);
 });
 
 function rememberBranches(db: DatabaseSync) {
@@ -220,12 +241,12 @@ test("需求分支可以合进任意选中的分支，并停回原来的分支",
   git(cwd, ["switch", "hold"]);
   const db = new DatabaseSync(":memory:");
   rememberBranches(db);
-  await mergeRequirementIntoBranch(db, cwd, "repo", "hold", "ship");
+  await mergeRequirementIntoBranch(db, cwd, "repo", "dev/demo", "ship");
   assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "hold");
   const files = execFileSync("git", ["ls-tree", "-r", "--name-only", "ship"], { cwd }).toString();
   assert.match(files, /q\.txt/);
   assert.match(files, /r\.txt/);
-  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "hold", "missing"), /没有这个本地分支/);
+  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "dev/demo", "missing"), /没有这个本地分支/);
 });
 
 test("合并到选中分支发生冲突时撤回，需求没有进入该分支", async () => {
@@ -251,9 +272,79 @@ test("合并到选中分支发生冲突时撤回，需求没有进入该分支",
   const db = new DatabaseSync(":memory:");
   rememberBranches(db);
   const before = execFileSync("git", ["rev-parse", "ship"], { cwd }).toString();
-  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "hold", "ship"));
+  await assert.rejects(() => mergeRequirementIntoBranch(db, cwd, "repo", "dev/demo", "ship"));
   assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "hold");
   assert.equal(execFileSync("git", ["rev-parse", "ship"], { cwd }).toString(), before);
   assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd }).toString(), "");
+});
+
+test("对不上的切片分支不会回落到其他会话", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-unmatched-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "release"]);
+  git(cwd, ["branch", "req/old"]);
+  git(cwd, ["branch", "dev/old"]);
+  git(cwd, ["switch", "dev/old"]);
+  writeFileSync(join(cwd, "old.txt"), "old\n");
+  git(cwd, ["add", "old.txt"]);
+  git(cwd, ["commit", "-m", "old"]);
+  git(cwd, ["switch", "main"]);
+  git(cwd, ["branch", "req/new"]);
+  git(cwd, ["switch", "-c", "dev/new"]);
+  writeFileSync(join(cwd, "new.txt"), "new\n");
+  git(cwd, ["add", "new.txt"]);
+  git(cwd, ["commit", "-m", "new"]);
+  git(cwd, ["switch", "main"]);
+  git(cwd, ["switch", "-c", "feature-api"]);
+  writeFileSync(join(cwd, "api.txt"), "api\n");
+  git(cwd, ["add", "api.txt"]);
+  git(cwd, ["commit", "-m", "api"]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    admitted INTEGER NOT NULL DEFAULT 0,
+    requirement_slice TEXT,
+    merge_target TEXT,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  const insert = db.prepare(
+    "INSERT INTO work_branches (repo_id, session_id, requirement, development, merge_target) VALUES (?, ?, ?, ?, ?)",
+  );
+  insert.run("repo", "old-session", "req/old", "dev/old", null);
+  insert.run("repo", "new-session", "req/new", "dev/new", "release");
+  const sha = (name: string) => execFileSync("git", ["rev-parse", name], { cwd }).toString();
+  const before = [sha("req/old"), sha("dev/old"), sha("req/new"), sha("dev/new"), sha("release"), sha("feature-api")];
+  await assert.rejects(() => mergeWorkBranches(db, cwd, "repo", "feature-api"), UnmatchedWorkBranchError);
+  await assert.rejects(
+    () => mergeRequirementIntoBranch(db, cwd, "repo", "feature-api", "release"),
+    /分支「feature-api」没有对应的需求会话，没有合并/,
+  );
+  assert.deepEqual([sha("req/old"), sha("dev/old"), sha("req/new"), sha("dev/new"), sha("release"), sha("feature-api")], before);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "feature-api");
+  assert.equal(readWorkBranches(db, "repo", "feature-api"), null);
+  const matched = readWorkBranches(db, "repo", "dev/new");
+  assert.equal(matched?.requirement, "req/new");
+  assert.equal(matched?.development, "dev/new");
+  assert.equal(readMergeTarget(db, "repo", "feature-api"), "");
+  assert.equal(readMergeTarget(db, "repo", "dev/new"), "release");
+  assert.equal(currentSessionId(db, "repo", "feature-api"), "");
+  assert.equal(sessionPhase(db, "repo", "feature-api", "slice-api"), null);
+  await mergeWorkBranches(db, cwd, "repo", "dev/new");
+  assert.equal(sha("req/new"), sha("dev/new"));
+  assert.notEqual(sha("req/old"), sha("dev/old"));
+  await mergeRequirementIntoBranch(db, cwd, "repo", "dev/new", "release");
+  const releaseFiles = execFileSync("git", ["ls-tree", "-r", "--name-only", "release"], { cwd }).toString();
+  assert.match(releaseFiles, /new\.txt/);
+  assert.doesNotMatch(releaseFiles, /old\.txt/);
+  assert.doesNotMatch(releaseFiles, /api\.txt/);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "feature-api");
 });
 

@@ -16,7 +16,7 @@ if (existing && alive(existing.pid) && !args.includes("--force")) {
   process.exit(0);
 }
 
-const running = await startServer({ repoPath, open });
+const running = await startServer({ repoPath, open, discoverWorkspaces: true });
 process.stdout.write(`${running.url}\n`);
 
 function alive(pid: number): boolean {

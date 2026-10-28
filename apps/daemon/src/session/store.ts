@@ -16,6 +16,7 @@ export type SliceRow = {
   repo_id: string;
   agent: string;
   purpose: string;
+  branch: string;
   state: SliceState;
   lease: Lease | null;
   base_sha: string | null;
@@ -41,6 +42,7 @@ export function openStore(): DatabaseSync {
       repo_id TEXT NOT NULL,
       agent TEXT NOT NULL,
       purpose TEXT NOT NULL,
+      branch TEXT NOT NULL DEFAULT '',
       state TEXT NOT NULL,
       lease TEXT,
       base_sha TEXT,
@@ -98,6 +100,10 @@ export function openStore(): DatabaseSync {
       resolution TEXT NOT NULL
     );
   `);
+  const sliceColumns = db.prepare("PRAGMA table_info(work_slices)").all() as Array<{ name: string }>;
+  if (!sliceColumns.some((column) => column.name === "branch")) {
+    db.exec("ALTER TABLE work_slices ADD COLUMN branch TEXT NOT NULL DEFAULT ''");
+  }
   db.prepare(
     `UPDATE work_slices SET state = 'awaiting_release', lease = NULL WHERE state = 'editing'`,
   ).run();
@@ -147,12 +153,12 @@ export function setBaseRef(db: DatabaseSync, id: string, baseRef: string): void 
   db.prepare("UPDATE repos SET base_ref = ? WHERE id = ?").run(baseRef, id);
 }
 
-export function activeSlice(db: DatabaseSync, repoId: string): SliceRow | undefined {
+export function activeSlice(db: DatabaseSync, repoId: string, branch: string): SliceRow | undefined {
   return db.prepare(
     `SELECT * FROM work_slices
-     WHERE repo_id = ? AND state IN ('awaiting_release', 'editing', 'awaiting_review')
+     WHERE repo_id = ? AND branch = ? AND state IN ('awaiting_release', 'editing', 'awaiting_review')
      ORDER BY created_at DESC LIMIT 1`,
-  ).get(repoId) as SliceRow | undefined;
+  ).get(repoId, branch) as SliceRow | undefined;
 }
 
 export function findSlice(db: DatabaseSync, id: string): SliceRow | undefined {
@@ -162,13 +168,14 @@ export function findSlice(db: DatabaseSync, id: string): SliceRow | undefined {
 export function insertSlice(db: DatabaseSync, row: SliceRow): void {
   db.prepare(
     `INSERT INTO work_slices (
-      id, repo_id, agent, purpose, state, lease, base_sha, commit_sha, mismatch, reject_reason, created_at, released_at, reviewed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, repo_id, agent, purpose, branch, state, lease, base_sha, commit_sha, mismatch, reject_reason, created_at, released_at, reviewed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.id,
     row.repo_id,
     row.agent,
     row.purpose,
+    row.branch,
     row.state,
     row.lease,
     row.base_sha,

@@ -1,0 +1,527 @@
+{
+  "name": "coding-review-assistant",
+  "description": "macOS 上的本机代码评审服务。面板用来放行、核对和查看差异；服务记录每一小段的作用，并在放行前拒绝 Agent 的写操作。",
+  "languages": [
+    "css",
+    "html",
+    "javascript",
+    "json",
+    "markdown",
+    "shell",
+    "swift",
+    "typescript",
+    "unknown",
+    "xml"
+  ],
+  "frameworks": [],
+  "files": [
+    {
+      "path": ".cursor/hooks.json",
+      "language": "json",
+      "sizeLines": 17,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".cursor/hooks/review-gate.sh",
+      "language": "shell",
+      "sizeLines": 2,
+      "fileCategory": "script"
+    },
+    {
+      "path": ".ua/config.json",
+      "language": "json",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "AGENTS.md",
+      "language": "markdown",
+      "sizeLines": 9,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "sizeLines": 9,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 25,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "apps/cli/review-gate.ts",
+      "language": "typescript",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/adapters/install.ts",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/branches.ts",
+      "language": "typescript",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/cursor-proxy.ts",
+      "language": "typescript",
+      "sizeLines": 145,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/cursor-workspaces.ts",
+      "language": "typescript",
+      "sizeLines": 41,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/explain.ts",
+      "language": "typescript",
+      "sizeLines": 448,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/gate/bugfix.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/gate/machine.ts",
+      "language": "typescript",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/gate/policy.ts",
+      "language": "typescript",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/git/diff.ts",
+      "language": "typescript",
+      "sizeLines": 198,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/git/lock.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/git/runner.ts",
+      "language": "typescript",
+      "sizeLines": 49,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/git/watcher.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/hook-target.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/index.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/local-file.ts",
+      "language": "typescript",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/panel.ts",
+      "language": "typescript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/paths.ts",
+      "language": "typescript",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/pick-folder.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/round.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/server.ts",
+      "language": "typescript",
+      "sizeLines": 722,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/session/store.ts",
+      "language": "typescript",
+      "sizeLines": 262,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/summary-ai.ts",
+      "language": "typescript",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/summary.ts",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/symbols.ts",
+      "language": "typescript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/daemon/src/work-branch.ts",
+      "language": "typescript",
+      "sizeLines": 370,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/mac/Panel.swift",
+      "language": "swift",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/app.css",
+      "language": "css",
+      "sizeLines": 212,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "apps/web/app.js",
+      "language": "javascript",
+      "sizeLines": 1265,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/index.html",
+      "language": "html",
+      "sizeLines": 87,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "docs/architecture.md",
+      "language": "markdown",
+      "sizeLines": 406,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "mac/install.sh",
+      "language": "shell",
+      "sizeLines": 29,
+      "fileCategory": "script"
+    },
+    {
+      "path": "mac/代码评审.app/Contents/Info.plist",
+      "language": "xml",
+      "sizeLines": 27,
+      "fileCategory": "config"
+    },
+    {
+      "path": "mac/代码评审.app/Contents/MacOS/launch",
+      "language": "unknown",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mac/代码评审.app/Contents/MacOS/panel",
+      "language": "unknown",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "package.json",
+      "language": "json",
+      "sizeLines": 10,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/protocol/src/index.ts",
+      "language": "typescript",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/branch-gate.test.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/bugfix.test.ts",
+      "language": "typescript",
+      "sizeLines": 73,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/complete-count.test.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/cursor-proxy.test.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/cursor-workspaces.test.ts",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/explain.test.ts",
+      "language": "typescript",
+      "sizeLines": 159,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/git-lock.test.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/local-file.test.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/merge-target.test.ts",
+      "language": "typescript",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/phase1.test.ts",
+      "language": "typescript",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/round.test.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/session-review.test.ts",
+      "language": "typescript",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/summary.test.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/user-hook.test.ts",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "test/work-branch.test.ts",
+      "language": "typescript",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 58,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    ".cursor/hooks.json": [],
+    ".cursor/hooks/review-gate.sh": [],
+    ".ua/config.json": [],
+    "AGENTS.md": [],
+    "CLAUDE.md": [],
+    "README.md": [],
+    "apps/cli/review-gate.ts": [
+      "apps/daemon/src/gate/policy.ts",
+      "apps/daemon/src/hook-target.ts"
+    ],
+    "apps/daemon/src/adapters/install.ts": [],
+    "apps/daemon/src/branches.ts": [
+      "apps/daemon/src/git/lock.ts"
+    ],
+    "apps/daemon/src/cursor-proxy.ts": [],
+    "apps/daemon/src/cursor-workspaces.ts": [],
+    "apps/daemon/src/explain.ts": [
+      "apps/daemon/src/summary-ai.ts"
+    ],
+    "apps/daemon/src/gate/bugfix.ts": [],
+    "apps/daemon/src/gate/machine.ts": [
+      "apps/daemon/src/gate/bugfix.ts",
+      "apps/daemon/src/gate/policy.ts",
+      "apps/daemon/src/git/diff.ts",
+      "apps/daemon/src/git/runner.ts",
+      "apps/daemon/src/session/store.ts",
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/gate/policy.ts": [
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/git/diff.ts": [
+      "apps/daemon/src/git/runner.ts",
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/git/lock.ts": [],
+    "apps/daemon/src/git/runner.ts": [
+      "apps/daemon/src/git/lock.ts"
+    ],
+    "apps/daemon/src/git/watcher.ts": [],
+    "apps/daemon/src/hook-target.ts": [],
+    "apps/daemon/src/index.ts": [
+      "apps/daemon/src/panel.ts",
+      "apps/daemon/src/server.ts",
+      "apps/daemon/src/session/store.ts"
+    ],
+    "apps/daemon/src/local-file.ts": [],
+    "apps/daemon/src/panel.ts": [],
+    "apps/daemon/src/paths.ts": [],
+    "apps/daemon/src/pick-folder.ts": [],
+    "apps/daemon/src/round.ts": [],
+    "apps/daemon/src/server.ts": [
+      "apps/daemon/src/adapters/install.ts",
+      "apps/daemon/src/branches.ts",
+      "apps/daemon/src/cursor-proxy.ts",
+      "apps/daemon/src/cursor-workspaces.ts",
+      "apps/daemon/src/explain.ts",
+      "apps/daemon/src/gate/bugfix.ts",
+      "apps/daemon/src/gate/machine.ts",
+      "apps/daemon/src/git/diff.ts",
+      "apps/daemon/src/git/runner.ts",
+      "apps/daemon/src/git/watcher.ts",
+      "apps/daemon/src/local-file.ts",
+      "apps/daemon/src/panel.ts",
+      "apps/daemon/src/pick-folder.ts",
+      "apps/daemon/src/round.ts",
+      "apps/daemon/src/session/store.ts",
+      "apps/daemon/src/summary.ts",
+      "apps/daemon/src/symbols.ts",
+      "apps/daemon/src/work-branch.ts",
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/session/store.ts": [
+      "apps/daemon/src/paths.ts",
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/summary-ai.ts": [
+      "apps/daemon/src/cursor-proxy.ts",
+      "apps/daemon/src/summary.ts",
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/summary.ts": [
+      "packages/protocol/src/index.ts"
+    ],
+    "apps/daemon/src/symbols.ts": [],
+    "apps/daemon/src/work-branch.ts": [
+      "apps/daemon/src/branches.ts"
+    ],
+    "apps/mac/Panel.swift": [],
+    "apps/web/app.css": [],
+    "apps/web/app.js": [],
+    "apps/web/index.html": [],
+    "docs/architecture.md": [],
+    "mac/install.sh": [],
+    "mac/代码评审.app/Contents/Info.plist": [],
+    "mac/代码评审.app/Contents/MacOS/launch": [],
+    "mac/代码评审.app/Contents/MacOS/panel": [],
+    "package.json": [],
+    "packages/protocol/src/index.ts": [],
+    "test/branch-gate.test.ts": [
+      "apps/daemon/src/server.ts"
+    ],
+    "test/bugfix.test.ts": [
+      "apps/daemon/src/gate/policy.ts",
+      "apps/daemon/src/server.ts"
+    ],
+    "test/complete-count.test.ts": [
+      "apps/daemon/src/gate/machine.ts",
+      "apps/daemon/src/session/store.ts"
+    ],
+    "test/cursor-proxy.test.ts": [
+      "apps/daemon/src/cursor-proxy.ts",
+      "apps/daemon/src/summary-ai.ts"
+    ],
+    "test/cursor-workspaces.test.ts": [
+      "apps/daemon/src/cursor-workspaces.ts",
+      "apps/daemon/src/server.ts"
+    ],
+    "test/explain.test.ts": [
+      "apps/daemon/src/explain.ts",
+      "apps/daemon/src/work-branch.ts"
+    ],
+    "test/git-lock.test.ts": [
+      "apps/daemon/src/git/lock.ts"
+    ],
+    "test/local-file.test.ts": [
+      "apps/daemon/src/local-file.ts"
+    ],
+    "test/merge-target.test.ts": [
+      "apps/daemon/src/server.ts"
+    ],
+    "test/phase1.test.ts": [
+      "apps/daemon/src/gate/policy.ts",
+      "apps/daemon/src/git/diff.ts",
+      "apps/daemon/src/server.ts",
+      "apps/daemon/src/session/store.ts"
+    ],
+    "test/round.test.ts": [
+      "apps/daemon/src/round.ts"
+    ],
+    "test/session-review.test.ts": [
+      "apps/daemon/src/server.ts"
+    ],
+    "test/summary.test.ts": [
+      "apps/daemon/src/summary-ai.ts",
+      "apps/daemon/src/summary.ts"
+    ],
+    "test/user-hook.test.ts": [
+      "apps/daemon/src/adapters/install.ts",
+      "apps/daemon/src/hook-target.ts"
+    ],
+    "test/work-branch.test.ts": [
+      "apps/daemon/src/branches.ts",
+      "apps/daemon/src/work-branch.ts"
+    ]
+  }
+}

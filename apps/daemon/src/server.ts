@@ -4,7 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { join, resolve } from "node:path";
 import { VERSION } from "../../../packages/protocol/src/index.ts";
 import { installGate } from "./adapters/install.ts";
-import { acknowledge, checkCall, complete, GateError, gateView, intend, reject, release, syncRepo } from "./gate/machine.ts";
+import { closeBugfix, openBugfix, readBugfix } from "./gate/bugfix.ts";
+import { acknowledge, checkCall, complete, GateError, gateView, intend, pinOpenSlices, reject, release, syncRepo } from "./gate/machine.ts";
 import {
   detectBaseRef,
   fileIdFor,
@@ -22,6 +23,7 @@ import { watchRepo } from "./git/watcher.ts";
 import {
   findRepo,
   findRepoByPath,
+  activeSlice,
   findSlice,
   insertRepo,
   countSlices,
@@ -33,15 +35,18 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
-import { checkoutBranch, listLocalBranches, startRef } from "./branches.ts";
+import { checkoutBranch, createBranch, listLocalBranches, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
-import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
-import { admitSession, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
+import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
+import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession, type ExplainProgress } from "./explain.ts";
+import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase, UnmatchedWorkBranchError } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
+import { readLocalLines } from "./local-file.ts";
 import { findSymbols, readSource } from "./symbols.ts";
+import { loadImpactChain } from "./impact.ts";
 
 type SocketClient = { send: (text: string) => void };
 
@@ -55,14 +60,17 @@ export type RunningServer = {
   close: () => Promise<void>;
 };
 
-export async function startServer(options: { repoPath: string; open?: boolean }): Promise<RunningServer> {
+export async function startServer(options: { repoPath: string; open?: boolean; discoverWorkspaces?: boolean }): Promise<RunningServer> {
   const db = openStore();
+  await pinOpenSlices(db);
   const token = randomBytes(32).toString("hex");
   const repoPath = await topLevel(resolve(options.repoPath));
   await beginOnRelease();
   const clients = new Set<SocketClient>();
   let fingerprint = "";
   let stopped = false;
+  let discovering = false;
+  let discovery: ReturnType<typeof setInterval> | null = null;
 
   const server = createServer(async (req, res) => {
     try {
@@ -108,6 +116,8 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   const cursorProxy = await startCursorProxy({ repoPath });
   useCursorProxy({ url: cursorProxy.url, token: cursorProxy.token });
+  await discoverCursorRepos();
+  if (options.discoverWorkspaces) discovery = setInterval(() => void discoverCursorRepos(), 8000);
 
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   const address = server.address();
@@ -115,6 +125,31 @@ export async function startServer(options: { repoPath: string; open?: boolean })
   writeDaemonInfo({ pid: process.pid, port, token });
   const url = `http://127.0.0.1:${port}/`;
   if (options.open) openPanel(url);
+
+  async function discoverCursorRepos(): Promise<void> {
+    if (!options.discoverWorkspaces || stopped || discovering) return;
+    discovering = true;
+    try {
+      const folders = readRecentFolderPaths(cursorRecentStatePath());
+      for (const folder of folders) {
+        if (stopped) return;
+        let top = "";
+        try {
+          top = await topLevel(folder);
+        } catch {
+          continue;
+        }
+        if (stopped || findRepoByPath(db, top)) continue;
+        const registered = await registerRepo(top);
+        if (stopped) return;
+        publish(registered.repoId, registered.branch);
+      }
+    } catch {
+      return;
+    } finally {
+      discovering = false;
+    }
+  }
 
   async function onRepoChange(): Promise<void> {
     if (stopped) return;
@@ -128,14 +163,34 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       const next = `${status.head}:${porcelain}`;
       if (!changed && next === fingerprint) return;
       fingerprint = next;
-      publish(repo.id);
+      publish(repo.id, status.branch);
     } catch {
       return;
     }
   }
 
-  function publish(repoId: string): void {
-    const view = gateView(db, repoId);
+  function publishExplain(repoId: string, anchor: { path: string; side: string; start: number; end: number }, event: ExplainProgress): void {
+    const payload = JSON.stringify({
+      type: "explain.progress",
+      repoId,
+      path: anchor.path,
+      side: anchor.side,
+      start: anchor.start,
+      end: anchor.end,
+      phase: event.phase,
+      text: event.text,
+    });
+    for (const client of clients) {
+      try {
+        client.send(payload);
+      } catch {
+        clients.delete(client);
+      }
+    }
+  }
+
+  function publish(repoId: string, branch: string): void {
+    const view = gateView(db, repoId, branch);
     const payload = JSON.stringify({
       type: "gate.updated",
       repoId,
@@ -169,7 +224,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       res.end(html);
       return;
     }
-    if (req.method === "GET" && (path === "/app.js" || path === "/app.css")) {
+    if (req.method === "GET" && (path === "/app.js" || path === "/app.css" || path === "/impact-layout.js")) {
       const type = path.endsWith(".js") ? "text/javascript" : "text/css";
       res.writeHead(200, { "content-type": `${type}; charset=utf-8`, "cache-control": "no-store" });
       res.end(readFileSync(join(webRoot, path.slice(1))));
@@ -215,7 +270,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
     if (req.method === "GET" && rest === "status") {
       const status = await repoStatus(repo.path, repo.base_ref);
-      const view = gateView(db, repo.id);
+      const view = gateView(db, repo.id, status.branch);
       await repairSessionRequirements(db, repo.path, repo.id);
       const pair = readWorkBranches(db, repo.id, status.branch);
       sendJson(res, 200, {
@@ -223,6 +278,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         baseRef: repo.base_ref,
         requirement: pair?.requirement ?? null,
         development: pair?.development ?? null,
+        mergeTarget: readMergeTarget(db, repo.id, status.branch) || null,
         gate: view.state,
         lease: view.lease,
       });
@@ -232,22 +288,38 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       sendJson(res, 200, { branches: await listLocalBranches(repo.path) });
       return;
     }
+    if (req.method === "POST" && rest === "branches") {
+      const body = await readJson(req);
+      const name = String(body.name ?? "");
+      const head = await headBranch(repo.path);
+      try {
+        await createBranch(repo.path, name, await branchBase(repo.path, repo.base_ref));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不能建立分支";
+        throw new GateError(message === "分支名无效" ? 400 : 409, message);
+      }
+      if ((await headBranch(repo.path)) !== head) throw new GateError(500, "新建分支不应切换当前检出");
+      sendJson(res, 200, { branch: name.trim() });
+      return;
+    }
     if (req.method === "POST" && rest === "branch") {
       const body = await readJson(req);
-      const view = gateView(db, repo.id);
+      const head = await headBranch(repo.path);
+      const view = gateView(db, repo.id, head);
       if (view.state !== "locked") throw new GateError(409, "评审进行中，不能切换分支");
       await checkoutBranch(repo.path, String(body.branch ?? ""));
-      publish(repo.id);
+      publish(repo.id, await headBranch(repo.path));
       const status = await repoStatus(repo.path, repo.base_ref);
       sendJson(res, 200, { branch: status.branch });
       return;
     }
     if (req.method === "POST" && rest === "work-branches") {
       const body = await readJson(req);
-      const view = gateView(db, repo.id);
+      const head = await headBranch(repo.path);
+      const view = gateView(db, repo.id, head);
       if (view.state !== "locked") throw new GateError(409, "评审进行中，不能建立分支");
       const pair = await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, repo.base_ref), String(body.name ?? ""));
-      publish(repo.id);
+      publish(repo.id, await headBranch(repo.path));
       sendJson(res, 200, pair);
       return;
     }
@@ -260,27 +332,47 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "gate") {
-      const view = gateView(db, repo.id);
       const head = await headBranch(repo.path);
-      if (view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
+      const asked = url.searchParams.get("branch")?.trim() ?? "";
+      const branch = asked || head;
+      const view = gateView(db, repo.id, branch);
+      if (branch === head && view.slice && view.state !== "awaiting_release" && view.state !== "locked") {
         admitSession(db, repo.id, head, view.slice.sliceId);
       }
-      sendJson(res, 200, { ...present(view), phase: sessionPhase(db, repo.id, head, view.slice?.sliceId ?? null) });
+      sendJson(res, 200, {
+        ...present(view),
+        phase: sessionPhase(db, repo.id, branch, view.slice?.sliceId ?? null),
+        mergeTarget: readMergeTarget(db, repo.id, branch) || null,
+        branch,
+        bugfix: readBugfix(db, repo.id),
+      });
+      return;
+    }
+    if (req.method === "POST" && rest === "gate/bugfix") {
+      const body = await readJson(req);
+      const purpose = String(body.purpose ?? "").trim();
+      if (!purpose) closeBugfix(db, repo.id);
+      else openBugfix(db, repo.id, purpose);
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, { bugfix: readBugfix(db, repo.id) });
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {
       const body = await readJson(req);
-      if (!gateView(db, repo.id).slice) {
+      let head = await headBranch(repo.path);
+      if (!gateView(db, repo.id, head).slice) {
         const session = String(body.session ?? "").trim();
-        if (!session) throw new GateError(400, "没有会话，不能建立分支");
-        if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
-          throw new GateError(400, "没有会话总结");
+        if (session) {
+          if (!readSessionBranches(db, repo.id, session) && !readSessionSummary(session)) {
+            throw new GateError(400, "没有会话总结");
+          }
+          await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
+          head = await headBranch(repo.path);
         }
-        await openWorkBranches(db, repo.path, repo.id, await branchBase(repo.path, "HEAD"), session, true);
       }
-      const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
+      const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""), head);
       if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
-      publish(repo.id);
+      publish(repo.id, head);
       sendJson(res, 200, present(view));
       return;
     }
@@ -292,51 +384,78 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       await settleFor(req, res, sliceId);
       return;
     }
+    if (req.method === "POST" && rest === "gate/target") {
+      const body = await readJson(req);
+      const head = await headBranch(repo.path);
+      try {
+        const mergeTarget = await bindMergeTarget(db, repo.path, repo.id, head, String(body.branch ?? ""));
+        publish(repo.id, head);
+        sendJson(res, 200, { mergeTarget });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不能绑定合并目标";
+        throw new GateError(409, message);
+      }
+      return;
+    }
     if (req.method === "POST" && rest === "gate/release") {
       const body = await readJson(req);
-      const released = await release(db, repo.path, String(body.sliceId ?? ""));
-      admitSession(db, repo.id, await headBranch(repo.path), String(body.sliceId ?? ""));
-      publishAfter(repo.id, released);
-      sendJson(res, 200, gateView(db, repo.id));
+      const head = await headBranch(repo.path);
+      const targetSlice = String(body.sliceId ?? "");
+      const slice = findSlice(db, targetSlice);
+      const branch = slice?.branch || head;
+      if (sessionPhase(db, repo.id, branch, targetSlice) === "requirement" && !readMergeTarget(db, repo.id, branch)) {
+        throw new GateError(409, "需求准入前要先绑定合并目标分支。");
+      }
+      const released = await release(db, repo.path, targetSlice);
+      admitSession(db, repo.id, branch, targetSlice);
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, released);
       return;
     }
     if (req.method === "POST" && rest === "gate/ack") {
       const body = await readJson(req);
       const status = await repoStatus(repo.path, repo.base_ref);
-      await mergeWorkBranches(db, repo.path, repo.id, status.branch);
+      const slice = findSlice(db, String(body.sliceId ?? ""));
+      const branchName = slice?.branch || status.branch;
       const branch = String(body.branch ?? "").trim();
-      if (branch) {
-        try {
-          await mergeRequirementIntoBranch(db, repo.path, repo.id, status.branch, branch);
-        } catch (error) {
+      let mergeNote = "";
+      try {
+        await mergeWorkBranches(db, repo.path, repo.id, branchName);
+        if (branch) await mergeRequirementIntoBranch(db, repo.path, repo.id, branchName, branch);
+      } catch (error) {
+        if (!(error instanceof UnmatchedWorkBranchError)) {
           const message = error instanceof Error ? error.message : "合并失败";
+          console.error(`核对通过未合并：${message}`);
           throw new GateError(409, message);
         }
+        mergeNote = branch ? `${error.message}选择的「${branch}」没有写入。` : error.message;
+        console.error(`核对通过未合并：${mergeNote}`);
       }
-      acknowledge(db, String(body.sliceId ?? ""));
-      publish(repo.id);
-      sendJson(res, 200, gateView(db, repo.id));
+      const view = acknowledge(db, String(body.sliceId ?? ""));
+      publish(repo.id, status.branch);
+      sendJson(res, 200, mergeNote ? { ...view, mergeNote } : view);
       return;
     }
     if (req.method === "POST" && rest === "gate/reject") {
       const body = await readJson(req);
-      await reject(db, repo.path, String(body.sliceId ?? ""), String(body.reason ?? ""));
-      publish(repo.id);
-      sendJson(res, 200, gateView(db, repo.id));
+      const view = await reject(db, repo.path, String(body.sliceId ?? ""), String(body.reason ?? ""));
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, view);
       return;
     }
     if (req.method === "POST" && rest === "gate/complete") {
-      await complete(db, repo.path, repo.id);
-      publish(repo.id);
-      sendJson(res, 200, present(gateView(db, repo.id)));
+      const view = await complete(db, repo.path, repo.id);
+      publish(repo.id, await headBranch(repo.path));
+      sendJson(res, 200, present(view));
       return;
     }
     if (req.method === "POST" && rest === "gate/check") {
-      sendJson(res, 200, checkCall(db, repo.id, await readJson(req)));
+      const body = await readJson(req);
+      sendJson(res, 200, checkCall(db, repo.id, body, await headBranch(repo.path)));
       return;
     }
     if (req.method === "POST" && rest === "gate/install") {
-      installGate(repo.path, cliPath);
+      installGate(cliPath);
       sendJson(res, 200, { installed: true });
       return;
     }
@@ -354,6 +473,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         page,
         pageSize: SLICE_PAGE_SIZE,
       });
+      return;
+    }
+    if (req.method === "GET" && rest === "impact") {
+      const files = await safeFiles(repo.path, repo.base_ref, repo.id, scope, sliceId, sessionQuery);
+      const paths = files.flatMap((file) => file.oldPath ? [file.path, file.oldPath] : [file.path]);
+      sendJson(res, 200, loadImpactChain(repo.path, paths));
       return;
     }
     if (req.method === "GET" && rest === "diff") {
@@ -384,6 +509,18 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       sendJson(res, 200, readSource(repo.path, url.searchParams.get("path") ?? "", Number(url.searchParams.get("line") ?? "1")));
       return;
     }
+    if (req.method === "GET" && rest === "local-file") {
+      const filePath = url.searchParams.get("path") ?? "";
+      const from = Number(url.searchParams.get("from") ?? "1");
+      const to = Number(url.searchParams.get("to") ?? "0");
+      try {
+        sendJson(res, 200, readLocalLines(repo.path, filePath, from, to));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "读不到本地文件";
+        throw new GateError(400, message);
+      }
+      return;
+    }
     if (req.method === "GET" && rest === "explain") {
       const session = explainSession(repo.id, await headBranch(repo.path), sessionQuery ?? "");
       sendJson(res, 200, { sessionId: session, threads: loadThreads(db, repo.id, session) });
@@ -402,7 +539,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       }
       const comment = String(body.comment ?? "").trim();
       if (!comment) throw new GateError(400, "先写下评论");
-      const result = await explainInSession(db, repo.id, session, lines, comment, anchor, repo.path);
+      const marker = anchor ?? {
+        path: lines[0]?.path ?? "",
+        side: lines[0]?.side ?? "head",
+        start: lines[0]?.line ?? 1,
+        end: lines[lines.length - 1]?.line ?? lines[0]?.line ?? 1,
+      };
+      const result = await explainInSession(db, repo.id, session, lines, comment, anchor, repo.path, (event) => {
+        publishExplain(repo.id, marker, event);
+      });
       sendJson(res, 200, { sessionId: session, ...result });
       return;
     }
@@ -419,9 +564,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     const next = await branchBase(repoPath, registered.baseRef);
     if (next !== "release") return;
     if (registered.baseRef !== "release") setBaseRef(db, registered.repoId, "release");
-    if (gateView(db, registered.repoId).state !== "locked") return;
     try {
       const current = (await git(repoPath, ["symbolic-ref", "--short", "HEAD"])).trim();
+      if (gateView(db, registered.repoId, current).state !== "locked") return;
       if (current !== "release") await checkoutBranch(repoPath, "release");
     } catch {
       return;
@@ -460,11 +605,26 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
+  function reviewedSession(repoId: string, sessionId: string | null) {
+    const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
+    if (!pair) return null;
+    return { pair, view: gateView(db, repoId, pair.development) };
+  }
+
   async function safeFiles(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null) {
     try {
       if (scope === "session") {
-        const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
-        return pair ? await listRange(cwd, pair.requirement, pair.development) : [];
+        const review = reviewedSession(repoId, sessionId);
+        if (!review) return [];
+        const slice = review.view.slice;
+        if (slice?.commitSha) {
+          const parent = await parentOf(cwd, slice.commitSha);
+          return parent ? await listCommit(cwd, parent, slice.commitSha) : [];
+        }
+        if (review.view.state === "editing" && review.pair.development === await headBranch(cwd)) {
+          return await listWorktree(cwd);
+        }
+        return await listRange(cwd, review.pair.requirement, review.pair.development);
       }
       if (scope === "branch") {
         const pair = readWorkBranches(db, repoId, await headBranch(cwd));
@@ -473,7 +633,9 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       }
       if (scope === "staged") return await listStaged(cwd);
       if (scope === "unstaged") return await listUnstaged(cwd);
-      const commit = commitFor(repoId, sliceId);
+      const head = await headBranch(cwd);
+      const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+      const commit = row?.commit_sha ?? null;
       if (commit) {
         const parent = await parentOf(cwd, commit);
         return parent ? await listCommit(cwd, parent, commit) : [];
@@ -486,8 +648,15 @@ export async function startServer(options: { repoPath: string; open?: boolean })
 
   async function diffArgsFor(cwd: string, baseRef: string, repoId: string, scope: string, sliceId: string | null, sessionId: string | null): Promise<string[]> {
     if (scope === "session") {
-      const pair = sessionId ? readSessionBranches(db, repoId, sessionId) : null;
-      return pair ? [`${pair.requirement}...${pair.development}`] : ["HEAD"];
+      const review = reviewedSession(repoId, sessionId);
+      if (!review) return ["HEAD"];
+      const slice = review.view.slice;
+      if (slice?.commitSha) {
+        const parent = await parentOf(cwd, slice.commitSha);
+        if (parent) return commitDiffArgs(parent, slice.commitSha, review.pair.development, await headBranch(cwd));
+      }
+      if (review.view.state === "editing" && review.pair.development === await headBranch(cwd)) return ["HEAD"];
+      return [`${review.pair.requirement}...${review.pair.development}`];
     }
     if (scope === "branch") {
       const pair = readWorkBranches(db, repoId, await headBranch(cwd));
@@ -496,10 +665,12 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
     if (scope === "staged") return ["--cached"];
     if (scope === "unstaged") return [];
-    const commit = commitFor(repoId, sliceId);
+    const head = await headBranch(cwd);
+    const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+    const commit = row?.commit_sha ?? null;
     if (commit) {
       const parent = await parentOf(cwd, commit);
-      if (parent) return [parent, commit];
+      if (parent) return commitDiffArgs(parent, commit, row?.branch ?? "", head);
     }
     return ["HEAD"];
   }
@@ -514,25 +685,19 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     }
   }
 
-  function commitFor(repoId: string, sliceId: string | null): string | null {
-    if (sliceId) return findSlice(db, sliceId)?.commit_sha ?? null;
-    return gateView(db, repoId).slice?.commitSha ?? null;
-  }
-
-  function publishAfter(repoId: string, _view: unknown): void {
-    publish(repoId);
-  }
-
-  function waitFor(req: IncomingMessage, res: ServerResponse, repoId: string, sliceId: string | null): Promise<void> {
-    const current = sliceId ? findSlice(db, sliceId) : null;
+  async function waitFor(req: IncomingMessage, res: ServerResponse, repoId: string, sliceId: string | null): Promise<void> {
+    const repo = findRepo(db, repoId);
+    const head = repo ? await headBranch(repo.path) : "";
+    const branchOf = (row: { branch?: string } | null | undefined) => row?.branch || head;
+    const current = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
     if (current && (current.state === "editing" || current.state === "rejected")) {
-      sendJson(res, 200, gateView(db, repoId));
-      return Promise.resolve();
+      sendJson(res, 200, gateView(db, repoId, branchOf(current)));
+      return;
     }
     return new Promise((done) => {
       const timer = setInterval(() => {
-        const row = sliceId ? findSlice(db, sliceId) : null;
-        const view = gateView(db, repoId);
+        const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+        const view = gateView(db, repoId, branchOf(row));
         const finished = row?.state === "editing" || row?.state === "rejected" || (view.state === "editing" && (!sliceId || view.slice?.sliceId === sliceId));
         if (!finished) return;
         clearInterval(timer);
@@ -574,6 +739,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     close: () =>
       new Promise((resolveClose) => {
         stopped = true;
+        if (discovery) clearInterval(discovery);
         watcher.close();
         useCursorProxy(null);
         void cursorProxy.close().finally(() => {
@@ -584,6 +750,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
         });
       }),
   };
+}
+
+export function commitDiffArgs(parent: string, commit: string, sliceBranch: string, head: string): string[] {
+  if (sliceBranch && sliceBranch === head) return [parent];
+  return [parent, commit];
 }
 
 async function topLevel(repoPath: string): Promise<string> {

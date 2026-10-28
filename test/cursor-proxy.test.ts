@@ -1,8 +1,25 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import test from "node:test";
-import { agentArgs, promptInput, readAgentRun, startCursorProxy, useCursorProxy } from "../apps/daemon/src/cursor-proxy.ts";
+import { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { agentArgs, agentEnvironment, promptInput, readAgentRun, readCursorAccessToken, startCursorProxy, useCursorProxy } from "../apps/daemon/src/cursor-proxy.ts";
 import { completePrompt, completeRun } from "../apps/daemon/src/summary-ai.ts";
+
+test("没有单独配置时，用 Cursor 已登录的令牌调用 agent", () => {
+  const env = agentEnvironment({ PATH: "/bin" }, "eyJ.test");
+  assert.equal(env.CURSOR_AUTH_TOKEN, "eyJ.test");
+  assert.equal(agentEnvironment({ CURSOR_API_KEY: "already" }, "eyJ.test").CURSOR_AUTH_TOKEN, undefined);
+  assert.equal(agentEnvironment({ CURSOR_AUTH_TOKEN: "kept" }, "eyJ.other").CURSOR_AUTH_TOKEN, "kept");
+  const dir = mkdtempSync(join(tmpdir(), "review-auth-"));
+  const db = new DatabaseSync(join(dir, "state.vscdb"));
+  db.exec("CREATE TABLE ItemTable (key TEXT, value TEXT)");
+  db.prepare("INSERT INTO ItemTable (key, value) VALUES (?, ?)").run("cursorAuth/accessToken", "eyJ.local");
+  assert.equal(readCursorAccessToken(join(dir, "state.vscdb")), "eyJ.local");
+  db.close();
+  assert.equal(readCursorAccessToken(join(dir, "missing.vscdb")), "");
+});
 
 test("从请求里取出要交给 Cursor 的原文", () => {
   assert.equal(promptInput({ input: " 解释这几行 " }), "解释这几行");
@@ -38,6 +55,51 @@ test("要求修改时允许写入，并从流里取出未执行的写文件内�
     tool_call: { writeToolCall: { args: { path: "a.ts", fileText: "return 1;\n" }, result: { success: { path: "/repo/a.ts" } } } },
   }));
   assert.equal(applied.writes[0]?.applied, true);
+});
+
+test("结果只说改好时，仍保留前面代码块里的修改", () => {
+  const run = readAgentRun([
+    JSON.stringify({ type: "assistant", message: { content: [{ text: "可以。\n```ts\nreturn listLocalBranches(cwd);\n```" }] } }),
+    JSON.stringify({ type: "result", result: "已经改好了。" }),
+  ].join("\n"));
+  assert.match(run.text, /return listLocalBranches\(cwd\);/);
+});
+
+test("Cursor 实际的 case/value 工具结果也能取出未落盘的修改", () => {
+  const denied = readAgentRun([
+    JSON.stringify({ type: "assistant", message: { content: [{ text: "好的。" }] } }),
+    JSON.stringify({
+      type: "tool_call",
+      subtype: "completed",
+      call_id: "1",
+      tool_call: {
+        tool: {
+          case: "editToolCall",
+          value: {
+            args: { path: "a.ts", oldString: "return total;", newString: "return 0;" },
+            result: { case: "error", value: { error: "门禁未放行" } },
+          },
+        },
+      },
+    }),
+    JSON.stringify({ type: "result", result: "好的。" }),
+  ].join("\n"));
+  assert.equal(denied.writes[0]?.applied, false);
+  assert.equal(denied.writes[0]?.oldText, "return total;");
+  assert.equal(denied.writes[0]?.newText, "return 0;");
+  const applied = readAgentRun(JSON.stringify({
+    type: "tool_call",
+    subtype: "completed",
+    call_id: "2",
+    tool_call: {
+      tool: {
+        case: "writeToolCall",
+        value: { args: { path: "a.ts", fileText: "return 1;\n" }, result: { case: "success", value: {} } },
+      },
+    },
+  }));
+  assert.equal(applied.writes[0]?.applied, true);
+  assert.equal(applied.writes[0]?.contents, "return 1;\n");
 });
 
 test("调用 Cursor agent 时信任工作区，只提问，不让它改文件", () => {

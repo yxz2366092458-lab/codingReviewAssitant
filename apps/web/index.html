@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>代码评审</title>
-    <link rel="stylesheet" href="/app.css?panel=10" />
+    <link rel="stylesheet" href="/app.css?panel=17" />
   </head>
   <body>
     <header class="top">
@@ -22,9 +22,15 @@
           <strong id="requirement-branch">未建立</strong>
           <span class="muted">开发分支</span>
           <strong id="development-branch">未建立</strong>
+          <span class="muted">合并目标</span>
+          <strong id="merge-target">未绑定</strong>
         </div>
       </div>
       <span id="gate-label" class="state"></span>
+      <form id="bugfix-entry" class="bugfix-entry">
+        <input id="bugfix-purpose" type="text" placeholder="bugfix 需求" spellcheck="false" />
+        <button type="submit" id="bugfix-open">跳过门禁</button>
+      </form>
       <div class="top-actions">
         <button type="button" data-scope="slice">本段</button>
         <button type="button" data-scope="branch">分支</button>
@@ -76,6 +82,6 @@
     </section>
     <p id="error" class="error" hidden></p>
     <script>/*__BOOT__*/</script>
-    <script src="/app.js?panel=10"></script>
+    <script type="module" src="/app.js?panel=18"></script>
   </body>
 </html>

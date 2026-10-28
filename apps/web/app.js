@@ -1,3 +1,5 @@
+import { layoutImpact } from "./impact-layout.js";
+
 const boot = window.__REVIEW__;
 const state = {
   repoId: "",
@@ -18,8 +20,10 @@ const state = {
   explainOpen: {},
   explainFolded: {},
   pendingExplain: {},
+  explainProgress: {},
   drafts: {},
   viewSession: "",
+  viewBranch: "",
   loadedExplainSession: "",
   sessions: [],
   branchQuery: "",
@@ -40,6 +44,7 @@ const labels = {
 };
 
 function gateLabel(gate) {
+  if (gate.bugfix) return "bugfix";
   if (gate.lease === "revert") return "待撤回";
   if (gate.phase === "requirement" && gate.state === "awaiting_release") return "待需求准入";
   if (gate.phase === "development" && gate.state === "awaiting_release") return "待开发";
@@ -73,6 +78,7 @@ async function bootRepo() {
   });
   $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
+  $("bugfix-entry").addEventListener("submit", (event) => void submitBugfix(event).catch(showError));
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -167,8 +173,10 @@ function resetView() {
   state.explainOpen = {};
   state.explainFolded = {};
   state.pendingExplain = {};
+  state.explainProgress = {};
   state.drafts = {};
   state.viewSession = "";
+  state.viewBranch = "";
   state.loadedExplainSession = "";
   state.sessions = [];
   state.branchQuery = "";
@@ -186,7 +194,14 @@ function connect() {
     events.close();
   }
   events = new WebSocket(`ws://127.0.0.1:${location.port}/repos/${state.repoId}/events?token=${boot.token}`);
-  events.addEventListener("message", () => void refresh().catch(showError));
+  events.addEventListener("message", (event) => {
+    const payload = readEvent(event.data);
+    if (payload?.type === "explain.progress") {
+      showExplainProgress(payload);
+      return;
+    }
+    void refresh().catch(showError);
+  });
 }
 
 function diffQuery() {
@@ -221,10 +236,28 @@ async function refresh() {
   }
 }
 
+async function syncRepoList() {
+  const repos = await api("/repos");
+  const same =
+    repos.length === state.repos.length &&
+    repos.every((repo, index) => repo.id === state.repos[index]?.id && repo.path === state.repos[index]?.path);
+  if (same) return;
+  state.repos = repos;
+  if (!repos.some((repo) => repo.id === state.repoId) && repos[0]) {
+    state.repoId = repos[0].id;
+    resetView();
+  }
+  renderRepoSelect();
+}
+
 async function loadPanel() {
+  await syncRepoList();
+  const gatePath = state.viewBranch
+    ? `/repos/${state.repoId}/gate?branch=${encodeURIComponent(state.viewBranch)}`
+    : `/repos/${state.repoId}/gate`;
   const [status, gate, diff, slices, sessionPage] = await Promise.all([
     api(`/repos/${state.repoId}/status`),
-    api(`/repos/${state.repoId}/gate`),
+    api(gatePath),
     api(`/repos/${state.repoId}/diff?${diffQuery()}`),
     api(`/repos/${state.repoId}/slices?page=${state.historyPage}`),
     api(`/repos/${state.repoId}/sessions`),
@@ -237,11 +270,13 @@ async function loadPanel() {
     purpose: gate.slice?.purpose,
     finalRound: gate.finalRound,
     phase: gate.phase,
+    bugfix: gate.bugfix ?? "",
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}:${file.status}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
     requirement: status.requirement,
     development: status.development,
+    mergeTarget: status.mergeTarget ?? gate.mergeTarget ?? "",
     historyPage: slices.page,
     history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
     sessions: state.sessions.map((item) => `${item.sessionId}:${item.current}`).join(","),
@@ -252,23 +287,34 @@ async function loadPanel() {
   });
   if (signature === state.signature) return;
   if (active !== state.loadedExplainSession) {
-    const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
-    state.explainThreads = thread.threads ?? [];
-    restoreExplainBubbles();
-    state.loadedExplainSession = active;
+    try {
+      const thread = await api(`/repos/${state.repoId}/explain?sessionId=${encodeURIComponent(active)}`);
+      state.explainThreads = thread.threads ?? [];
+      restoreExplainBubbles();
+      state.loadedExplainSession = active;
+      showNotice("");
+    } catch (error) {
+      showError(error);
+    }
   }
   state.signature = signature;
   renderSessions(active);
   renderWorkBranches(shownBranches(status));
+  $("merge-target").textContent = (state.viewBranch ? gate.mergeTarget : status.mergeTarget) || "未绑定";
   $("gate-label").textContent = gateLabel(gate);
   document.querySelectorAll("[data-scope]").forEach((button) => {
     button.classList.toggle("active", button.dataset.scope === state.scope);
   });
   state.files = diff.files ?? [];
   renderSummary(gate);
+  renderBugfix(gate);
   renderFiles(diff.files ?? []);
   renderHistory(slices);
   if (!state.fileId && diff.files?.[0]) state.fileId = diff.files[0].fileId;
+  if (state.mode === "impact") {
+    await renderImpact();
+    return;
+  }
   if (state.fileId && (diff.files ?? []).some((file) => file.fileId === state.fileId)) await renderPatch();
   else {
     $("diff").replaceChildren();
@@ -277,7 +323,39 @@ async function loadPanel() {
   }
 }
 
+function renderBugfix(gate) {
+  const input = $("bugfix-purpose");
+  const button = $("bugfix-open");
+  const open = Boolean(gate.bugfix);
+  button.dataset.mode = open ? "close" : "open";
+  button.textContent = open ? "恢复门禁" : "跳过门禁";
+  if (document.activeElement === input) return;
+  input.value = gate.bugfix || "";
+}
+
+async function submitBugfix(event) {
+  event.preventDefault();
+  const closing = $("bugfix-open").dataset.mode === "close";
+  const purpose = closing ? "" : $("bugfix-purpose").value.trim();
+  if (!closing && !purpose) return;
+  await api(`/repos/${state.repoId}/gate/bugfix`, {
+    method: "POST",
+    body: JSON.stringify({ purpose }),
+  });
+  $("bugfix-purpose").blur();
+  await refresh();
+}
+
 function renderSummary(gate) {
+  if (gate.bugfix) {
+    $("meta").textContent = "门禁已跳过";
+    $("purpose").textContent = gate.bugfix;
+    $("round-label").hidden = true;
+    $("phase-label").hidden = true;
+    $("decision-wrap").hidden = true;
+    $("banner").hidden = true;
+    return;
+  }
   const slice = gate.slice;
   $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
   $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";
@@ -298,13 +376,17 @@ function renderSummary(gate) {
   wrap.hidden = !show;
   if (!show || !slice) return;
   if (gate.state === "awaiting_review") {
-    const picker = renderBranchPicker(typingBranch, branchCaret);
+    const picker = renderBranchPicker(typingBranch, branchCaret, "选择分支");
     decisions.append(picker);
     decisions.append(decision("核验通过", () => verify(slice.sliceId, picker.querySelector("select"))));
-    void fillBranches(picker.querySelector("select")).catch(showError);
+    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError);
+  } else if (gate.phase === "requirement") {
+    const picker = renderBranchPicker(typingBranch, branchCaret, "合并目标");
+    decisions.append(picker);
+    decisions.append(decision("需求准入", () => admit(slice.sliceId, picker.querySelector("select"))));
+    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError);
   } else {
-    const primary = gate.phase === "requirement" ? "需求准入" : "放行";
-    decisions.append(decision(primary, () => act("release", slice.sliceId)));
+    decisions.append(decision("放行", () => act("release", slice.sliceId)));
   }
   decisions.append(decision("退回", () => act("reject", slice.sliceId)));
   const banner = $("banner");
@@ -336,17 +418,18 @@ async function act(name, sliceId) {
   await refresh();
 }
 
-function renderBranchPicker(wasTyping, caret) {
+function renderBranchPicker(wasTyping, caret, emptyLabel = "选择分支") {
   const picker = document.createElement("div");
   picker.className = "branch-picker";
   const search = document.createElement("input");
   search.id = "branch-search";
   search.type = "search";
-  search.placeholder = "搜索分支";
+  search.placeholder = "搜索或新建分支";
   search.spellcheck = false;
   search.autocomplete = "off";
   search.value = state.branchQuery;
   const select = document.createElement("select");
+  select.dataset.emptyLabel = emptyLabel;
   select.addEventListener("change", () => {
     state.branchChoice = select.value;
   });
@@ -364,13 +447,15 @@ function renderBranchPicker(wasTyping, caret) {
 }
 
 function renderBranchOptions(select) {
-  const query = state.branchQuery.trim().toLowerCase();
+  const query = state.branchQuery.trim();
+  const queryLower = query.toLowerCase();
   const chosen = state.branchChoice;
-  const names = state.branchNames.filter((name) => name.toLowerCase().includes(query));
+  const names = state.branchNames.filter((name) => name.toLowerCase().includes(queryLower));
   select.replaceChildren();
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = query && names.length === 0 ? "没有匹配的分支" : "选择分支";
+  const emptyLabel = select.dataset.emptyLabel || "选择分支";
+  placeholder.textContent = query && names.length === 0 ? "没有匹配的分支" : emptyLabel;
   select.append(placeholder);
   for (const name of names) {
     const option = document.createElement("option");
@@ -378,30 +463,76 @@ function renderBranchOptions(select) {
     option.textContent = name;
     select.append(option);
   }
-  select.value = names.includes(chosen) ? chosen : "";
+  if (query && !state.branchNames.includes(query)) {
+    const create = document.createElement("option");
+    create.value = `__create__:${query}`;
+    create.textContent = `新建分支 ${query}`;
+    select.append(create);
+  }
+  if (names.includes(chosen) || chosen.startsWith("__create__:")) select.value = chosen;
+  else select.value = "";
 }
 
-async function fillBranches(select) {
+async function fillBranches(select, preferred = "") {
   const { branches } = await api(`/repos/${state.repoId}/branches`);
   if (!select?.isConnected) return;
   state.branchNames = branches ?? [];
+  if (!state.branchChoice && preferred && state.branchNames.includes(preferred)) {
+    state.branchChoice = preferred;
+  }
   renderBranchOptions(select);
+}
+
+async function ensureBranch(select) {
+  let branch = select.value.trim();
+  if (branch.startsWith("__create__:")) branch = branch.slice("__create__:".length).trim();
+  if (!branch && state.branchQuery.trim() && !state.branchNames.includes(state.branchQuery.trim())) {
+    branch = state.branchQuery.trim();
+  }
+  if (!branch) return "";
+  if (!state.branchNames.includes(branch)) {
+    await api(`/repos/${state.repoId}/branches`, {
+      method: "POST",
+      body: JSON.stringify({ name: branch }),
+    });
+    state.branchNames = [...state.branchNames, branch];
+    state.branchChoice = branch;
+    state.branchQuery = branch;
+    renderBranchOptions(select);
+    select.value = branch;
+  }
+  return branch;
+}
+
+async function admit(sliceId, select) {
+  const branch = await ensureBranch(select);
+  if (!branch) {
+    showNotice("需求准入前要先绑定合并目标分支。");
+    return;
+  }
+  await api(`/repos/${state.repoId}/gate/target`, {
+    method: "POST",
+    body: JSON.stringify({ branch }),
+  });
+  state.branchChoice = "";
+  state.branchQuery = "";
+  await act("release", sliceId);
 }
 
 let verifying = false;
 
 async function verify(sliceId, select) {
   if (verifying) return;
-  const branch = select.value.trim();
-  if (!branch) {
-    showNotice("请选择要合并过去的分支。");
-    return;
-  }
   verifying = true;
   select.disabled = true;
   for (const field of $("decisions").querySelectorAll("button, input, select")) field.disabled = true;
   try {
-    await api(`/repos/${state.repoId}/gate/ack`, {
+    const branch = await ensureBranch(select);
+    if (!branch) {
+      showNotice("请选择要合并过去的分支。");
+      return;
+    }
+    const result = await api(`/repos/${state.repoId}/gate/ack`, {
       method: "POST",
       body: JSON.stringify({ sliceId, branch }),
     });
@@ -409,6 +540,7 @@ async function verify(sliceId, select) {
     state.branchChoice = "";
     state.branchQuery = "";
     await refresh();
+    if (result.mergeNote) showNotice(result.mergeNote);
   } finally {
     verifying = false;
     if (select.isConnected) {
@@ -424,6 +556,30 @@ function showFileHead(pathText, summary) {
   node.textContent = summary;
 }
 
+function classNameOf(path) {
+  return path.split("/").filter(Boolean).pop() || path;
+}
+
+async function copyClassName(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  button.textContent = "已复制";
+  setTimeout(() => {
+    if (button.isConnected) button.textContent = "复制";
+  }, 1200);
+}
+
 function renderFiles(files) {
   const aside = $("files");
   aside.replaceChildren();
@@ -437,11 +593,24 @@ function renderFiles(files) {
   for (const file of files) {
     const row = document.createElement("div");
     row.className = `file${file.fileId === state.fileId ? " selected" : ""}`;
+    const label = classNameOf(file.path);
     const name = document.createElement("span");
-    name.textContent = file.path.split("/").pop();
+    name.className = "file-name";
+    name.textContent = label;
+    name.title = label;
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "copy-name";
+    copy.textContent = "复制";
+    copy.title = "复制类名";
+    copy.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void copyClassName(label, copy);
+    });
     const stat = document.createElement("small");
     stat.textContent = `+${file.additions} -${file.deletions}`;
-    row.append(name, stat);
+    row.append(name, copy, stat);
     row.addEventListener("click", () => {
       state.fileId = file.fileId;
       state.source = "";
@@ -467,6 +636,162 @@ async function renderPatch() {
   placeExplainBars();
 }
 
+const IMPACT_EDGE_LABEL = {
+  imports: "导入",
+  calls: "调用",
+  depends_on: "依赖",
+  tested_by: "测试",
+  configures: "配置",
+  middleware: "中间件",
+  triggers: "触发",
+  reads_from: "读取",
+  writes_to: "写入",
+  subscribes: "订阅",
+  publishes: "发布",
+};
+
+async function renderImpact() {
+  showFileHead("影响链", "方法挂在所属类下面，只保留直接连到改动的影响边。");
+  renderViewbar();
+  const diff = $("diff");
+  diff.replaceChildren();
+  try {
+    diff.append(impactGraph(await api(`/repos/${state.repoId}/impact?${diffQuery()}`)));
+  } catch (error) {
+    diff.append(emptyNote(error instanceof Error ? error.message : "影响链没有画出来"));
+  }
+}
+
+function impactGraph(chain) {
+  const wrap = document.createElement("div");
+  wrap.className = "impact";
+  if (!chain.available) {
+    wrap.append(emptyNote("这个仓库还没有知识图谱，影响链画不出来。"));
+    return wrap;
+  }
+  const nodes = chain.nodes ?? [];
+  const edges = chain.edges ?? [];
+  if (!nodes.length) {
+    wrap.append(emptyNote("当前差异在知识图谱里没有对应节点。"));
+    return wrap;
+  }
+  const legend = document.createElement("p");
+  legend.className = "impact-legend";
+  legend.innerHTML = `<span><i class="changed"></i>改动</span><span><i class="affected"></i>受影响</span>`;
+  wrap.append(legend);
+  if (!edges.length) wrap.append(emptyNote("这些改动没有直接的影响边。"));
+  wrap.append(impactSvg(nodes, edges));
+  return wrap;
+}
+
+function emptyNote(text) {
+  const note = document.createElement("p");
+  note.className = "empty";
+  note.textContent = text;
+  return note;
+}
+
+function impactSvg(nodes, edges) {
+  const layout = layoutImpact(nodes, edges);
+  const svg = svgEl("svg", {
+    width: layout.width,
+    height: layout.height,
+    role: "img",
+    "aria-label": "改动影响链",
+  });
+  const marker = svgEl("marker", { id: "impact-arrow", viewBox: "0 0 8 8", refX: "8", refY: "4", markerWidth: "8", markerHeight: "8", orient: "auto" });
+  marker.append(svgEl("path", { d: "M0,0 L8,4 L0,8 Z" }));
+  const defs = svgEl("defs", {});
+  defs.append(marker);
+  svg.append(defs);
+  for (const route of layout.routes) {
+    svg.append(svgEl("path", { d: route.trunk, class: "impact-edge" }));
+    for (const d of route.branches) svg.append(svgEl("path", { d, class: "impact-edge", "marker-end": "url(#impact-arrow)" }));
+  }
+  for (const label of layout.labels) {
+    const text = svgEl("text", { x: label.x, y: label.y, "text-anchor": "start", class: "impact-edge-label" });
+    text.textContent = IMPACT_EDGE_LABEL[label.type] ?? label.type;
+    svg.append(text);
+  }
+  for (const frame of layout.frames) {
+    svg.append(moduleFrame(frame));
+    for (const block of frame.blocks) {
+      if (block.kind === "class") svg.append(classNode(block));
+      const symbols = block.kind === "class" ? block.methods : [block];
+      for (const child of symbols) svg.append(symbolNode(child));
+    }
+  }
+  return svg;
+}
+
+function moduleFrame(frame) {
+  const group = svgEl("g", {});
+  group.append(svgEl("rect", {
+    x: frame.x,
+    y: frame.y,
+    width: frame.w,
+    height: frame.h,
+    rx: "10",
+    class: frame.changed ? "impact-module changed" : "impact-module",
+  }));
+  const name = svgEl("text", { x: frame.x + 12, y: frame.y + 22, class: "impact-name" });
+  name.textContent = clipText(frame.head, 24);
+  const path = svgEl("text", { x: frame.x + 12, y: frame.y + 36, class: "impact-path" });
+  path.textContent = clipText(frame.path, 32);
+  group.append(name, path);
+  const title = svgEl("title", {});
+  title.textContent = frame.file?.summary || frame.path || frame.head;
+  group.append(title);
+  return group;
+}
+
+function classNode(block) {
+  const group = svgEl("g", {});
+  group.append(svgEl("rect", {
+    x: block.x,
+    y: block.y,
+    width: block.w,
+    height: block.h,
+    rx: "8",
+    class: block.changed ? "impact-class changed" : "impact-class",
+  }));
+  const name = svgEl("text", { x: block.x + 10, y: block.y + 18, class: "impact-name" });
+  name.textContent = clipText(block.node.name, 22);
+  group.append(name);
+  const title = svgEl("title", {});
+  title.textContent = block.node.summary || block.node.name;
+  group.append(title);
+  return group;
+}
+
+function symbolNode(child) {
+  const group = svgEl("g", { transform: `translate(${child.x} ${child.y})` });
+  group.append(svgEl("rect", {
+    width: child.w,
+    height: child.h,
+    rx: "6",
+    class: child.node.role === "changed" ? "impact-node changed" : "impact-node",
+  }));
+  const name = svgEl("text", { x: "10", y: "21", class: "impact-name" });
+  name.textContent = clipText(child.node.name, 24);
+  group.append(name);
+  const title = svgEl("title", {});
+  title.textContent = child.node.summary || child.node.name;
+  group.append(title);
+  return group;
+}
+
+function clipText(text, max) {
+  const value = text || "";
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+function svgEl(name, attrs) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
+}
+
 function renderViewbar() {
   const bar = $("viewbar");
   bar.className = "viewbar";
@@ -477,15 +802,18 @@ function renderViewbar() {
   const row = document.createElement("div");
   row.className = "row";
   row.append(
-    viewButton("单文件", state.mode === "unified", () => { state.mode = "unified"; }),
-    viewButton("双文件", state.mode === "split", () => { state.mode = "split"; }),
+    viewButton("单文件", state.mode === "unified", () => { state.mode = "unified"; return refresh(); }),
+    viewButton("双文件", state.mode === "split", () => { state.mode = "split"; return refresh(); }),
+    viewButton("影响链", state.mode === "impact", () => { state.mode = "impact"; return refresh(); }),
     viewButton("定义", state.symbol === "definition", () => void symbols("definition")),
     viewButton("引用", state.symbol === "references", () => void symbols("references")),
   );
   bar.append(kicker, row);
   const hint = document.createElement("p");
   hint.className = "muted";
-  hint.textContent = "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
+  hint.textContent = state.mode === "impact"
+    ? "方法画在所属类里面。同一起点的边先并成一条，再按终点分开，平行的边之间留出间隔。"
+    : "点行号多选，按住左键拖动同一侧的行。滑过已选中的行会取消选中。连续选区的正下方展开解释栏，一个文件里可以有多条。";
   bar.append(hint);
   const box = $("locations");
   box.replaceChildren();
@@ -804,7 +1132,7 @@ function explainDock(group) {
     body.append(item);
   }
   const pending = state.pendingExplain[key];
-  if (pending === "comment") body.append(explainPending());
+  if (pending === "comment") body.append(explainPending(key));
   const text = document.createElement("textarea");
   text.rows = 2;
   text.placeholder = "写下对这段代码的评论。";
@@ -845,7 +1173,7 @@ function explainBubble(group, mode) {
     switcher.append(button);
   }
   bubble.append(switcher);
-  if (state.pendingExplain[key] === mode) bubble.append(explainPending());
+  if (state.pendingExplain[key] === mode) bubble.append(explainPending(key));
   const content = group.modes?.[mode] || threadModes(key)?.[mode] || "";
   if (content) {
     const body = document.createElement("p");
@@ -899,6 +1227,8 @@ async function requestExplain(group, mode) {
   }
   const key = anchorKey(group);
   state.pendingExplain[key] = mode;
+  state.explainProgress[key] = "正在回答";
+  showNotice("正在回答");
   placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
@@ -912,9 +1242,11 @@ async function requestExplain(group, mode) {
     });
     rememberThread(result, group);
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
   } catch (error) {
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
     throw error;
   }
@@ -962,16 +1294,42 @@ function paintAppliedEdit() {
   }
 }
 
-function explainPending() {
+function explainPending(key) {
   const row = document.createElement("p");
   row.className = "explain-pending";
   const icon = document.createElement("span");
   icon.className = "spinner";
   icon.setAttribute("aria-hidden", "true");
   const label = document.createElement("span");
-  label.textContent = "AI处理中";
+  label.textContent = state.explainProgress[key] || "正在回答";
   row.append(icon, label);
   return row;
+}
+
+function readEvent(data) {
+  if (typeof data !== "string") return null;
+  try {
+    const payload = JSON.parse(data);
+    return payload && typeof payload === "object" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+function showExplainProgress(payload) {
+  if (payload.repoId && state.repoId && payload.repoId !== state.repoId) return;
+  const key = anchorKey({
+    path: payload.path,
+    side: payload.side,
+    start: Number(payload.start),
+    end: Number(payload.end),
+  });
+  const text = String(payload.text || "");
+  if (!text) return;
+  if (!state.pendingExplain[key] && payload.phase !== "fail") return;
+  state.explainProgress[key] = text;
+  if (state.pendingExplain[key] || payload.phase === "fail") showNotice(text);
+  placeExplainBars();
 }
 
 async function sendComment(group, text) {
@@ -988,6 +1346,8 @@ async function sendComment(group, text) {
   }
   state.drafts[key] = comment;
   state.pendingExplain[key] = "comment";
+  state.explainProgress[key] = "正在理解评论";
+  showNotice("正在理解评论");
   placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
@@ -1002,18 +1362,24 @@ async function sendComment(group, text) {
     rememberThread(result, group);
     delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     if (result.edited) {
-      state.appliedEdit = result.edit?.path ? result.edit : { path: group.path, start: group.start, end: group.end, code: "" };
-      showNotice(state.appliedEdit.path ? `已写入 ${state.appliedEdit.path}` : "已写入工作区");
+      const written = result.edit?.path || group.path;
+      state.appliedEdit = { path: written, start: 0, end: 0, code: "" };
+      const notice = written ? `已写入 ${written}` : "已写入工作区";
+      showNotice(notice);
       state.signature = "";
       await refresh();
+      showNotice(notice);
     } else {
       placeExplainBars();
     }
   } catch (error) {
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    showNotice(message.startsWith("失败：") ? message : `失败：${message}`);
   }
 }
 
@@ -1082,6 +1448,7 @@ function emptyDiffText(gate) {
 
 function openSession(item) {
   state.viewSession = item.current ? "" : item.sessionId;
+  state.viewBranch = item.current ? "" : item.development;
   state.scope = item.current ? "slice" : "session";
   state.sliceId = "";
   state.fileId = "";
@@ -1115,6 +1482,7 @@ function renderHistory(page) {
       state.sliceId = slice.sliceId;
       state.scope = "slice";
       state.viewSession = "";
+      state.viewBranch = "";
       state.fileId = "";
       state.signature = "";
       void refresh().catch(showError);
@@ -1174,6 +1542,7 @@ document.addEventListener("click", (event) => {
     state.sliceId = "";
     state.fileId = "";
     state.viewSession = "";
+    state.viewBranch = "";
     state.picked = [];
     state.signature = "";
     void refresh().catch(showError);
@@ -1187,7 +1556,7 @@ document.addEventListener("click", (event) => {
     }
     void api(`/repos/${state.repoId}/gate/install`, { method: "POST", body: "{}" })
       .then(() => {
-        showNotice("门禁已写入这个仓库。请新开一个 Agent 对话，放行前的写文件才会被拦住。");
+        showNotice("门禁已装到本机 Cursor 智能体。之后任意项目里的 Agent 写文件都会先过这道门。请新开一个对话后生效。");
       })
       .catch(showError);
     return;

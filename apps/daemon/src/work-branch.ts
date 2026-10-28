@@ -94,6 +94,14 @@ function firstUserAsk(sessionId: string): string {
   return "";
 }
 
+export class UnmatchedWorkBranchError extends Error {
+  constructor(branch: string) {
+    const name = branch.trim() || "当前分支";
+    super(`分支「${name}」没有对应的需求会话，没有合并。未登记的开发分支不会并入其他会话。`);
+    this.name = "UnmatchedWorkBranchError";
+  }
+}
+
 export function readWorkBranches(
   db: DatabaseSync,
   repoId: string,
@@ -104,12 +112,7 @@ export function readWorkBranches(
     requirement: string;
     development: string;
   }>;
-  if (!rows.length) return null;
-  if (headBranch) {
-    const match = rows.find((row) => row.development === headBranch);
-    if (match) return match;
-  }
-  return rows[rows.length - 1] ?? null;
+  return matchDevelopment(rows, headBranch);
 }
 
 export async function openWorkBranches(
@@ -150,8 +153,11 @@ export async function openWorkBranches(
 
 export async function mergeWorkBranches(db: DatabaseSync, cwd: string, repoId: string, headBranch: string): Promise<void> {
   const pair = readWorkBranches(db, repoId, headBranch);
-  if (!pair) return;
-  await mergeFastForward(cwd, pair.requirement, pair.development);
+  if (pair) {
+    await mergeFastForward(cwd, pair.requirement, pair.development);
+    return;
+  }
+  if (hasWorkBranches(db, repoId)) throw new UnmatchedWorkBranchError(headBranch);
 }
 
 export async function mergeRequirementIntoBranch(
@@ -163,7 +169,10 @@ export async function mergeRequirementIntoBranch(
 ): Promise<void> {
   const target = assertBranchName(targetBranch);
   const pair = readWorkBranches(db, repoId, headBranch);
-  if (!pair) throw new Error("还没有需求分支");
+  if (!pair) {
+    if (hasWorkBranches(db, repoId)) throw new UnmatchedWorkBranchError(headBranch);
+    throw new Error("还没有需求分支");
+  }
   await mergeBranch(cwd, target, pair.requirement);
 }
 
@@ -205,9 +214,7 @@ export function currentSessionId(db: DatabaseSync, repoId: string, headBranch: s
     session_id: string;
     development: string;
   }>;
-  if (!rows.length) return "";
-  const match = headBranch ? rows.find((row) => row.development === headBranch) : undefined;
-  return (match ?? rows[rows.length - 1])?.session_id.trim() ?? "";
+  return matchDevelopment(rows, headBranch)?.session_id.trim() ?? "";
 }
 
 export function sessionPhase(
@@ -230,6 +237,32 @@ export function admitSession(db: DatabaseSync, repoId: string, headBranch: strin
     repoId,
     row.development,
   );
+}
+
+export function readMergeTarget(db: DatabaseSync, repoId: string, headBranch: string): string {
+  return readRecord(db, repoId, headBranch)?.merge_target?.trim() ?? "";
+}
+
+export async function bindMergeTarget(
+  db: DatabaseSync,
+  cwd: string,
+  repoId: string,
+  headBranch: string,
+  target: string,
+): Promise<string> {
+  const name = assertBranchName(target);
+  const row = readRecord(db, repoId, headBranch);
+  if (!row) throw new Error("还没有这条会话的分支");
+  if (row.admitted) throw new Error("需求已经准入，不能再改合并目标");
+  if (name === row.development || name === row.requirement) throw new Error("合并目标不能是这条会话自己的分支");
+  const branches = await listLocalBranches(cwd);
+  if (!branches.includes(name)) throw new Error("没有这个本地分支");
+  db.prepare("UPDATE work_branches SET merge_target = ? WHERE repo_id = ? AND development = ?").run(
+    name,
+    repoId,
+    row.development,
+  );
+  return name;
 }
 
 export async function repairSessionRequirements(
@@ -286,19 +319,27 @@ async function availableRequirement(db: DatabaseSync, cwd: string, repoId: strin
 function readRecord(db: DatabaseSync, repoId: string, headBranch: string) {
   ensureWorkBranches(db);
   const rows = db.prepare(
-    "SELECT requirement, development, admitted, requirement_slice FROM work_branches WHERE repo_id = ?",
+    "SELECT requirement, development, admitted, requirement_slice, merge_target FROM work_branches WHERE repo_id = ?",
   ).all(repoId) as Array<{
     requirement: string;
     development: string;
     admitted: number;
     requirement_slice: string | null;
+    merge_target: string | null;
   }>;
-  if (!rows.length) return null;
-  if (headBranch) {
-    const match = rows.find((row) => row.development === headBranch);
-    if (match) return match;
-  }
-  return rows[rows.length - 1] ?? null;
+  return matchDevelopment(rows, headBranch);
+}
+
+function matchDevelopment<T extends { development: string }>(rows: T[], headBranch: string): T | null {
+  const branch = headBranch.trim();
+  if (!branch) return null;
+  return rows.find((row) => row.development === branch) ?? null;
+}
+
+function hasWorkBranches(db: DatabaseSync, repoId: string): boolean {
+  ensureWorkBranches(db);
+  const row = db.prepare("SELECT 1 AS ok FROM work_branches WHERE repo_id = ? LIMIT 1").get(repoId) as { ok: number } | undefined;
+  return row !== undefined;
 }
 
 function ensureWorkBranches(db: DatabaseSync): void {
@@ -310,6 +351,7 @@ function ensureWorkBranches(db: DatabaseSync): void {
       development TEXT NOT NULL,
       admitted INTEGER NOT NULL DEFAULT 0,
       requirement_slice TEXT,
+      merge_target TEXT,
       PRIMARY KEY (repo_id, session_id)
     )`);
   };
@@ -335,5 +377,8 @@ function ensureWorkBranches(db: DatabaseSync): void {
   }
   if (!ready.some((column) => column.name === "requirement_slice")) {
     db.exec("ALTER TABLE work_branches ADD COLUMN requirement_slice TEXT");
+  }
+  if (!ready.some((column) => column.name === "merge_target")) {
+    db.exec("ALTER TABLE work_branches ADD COLUMN merge_target TEXT");
   }
 }

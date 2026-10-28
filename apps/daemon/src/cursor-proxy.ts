@@ -2,8 +2,10 @@ import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { DatabaseSync } from "node:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { cursorRecentStatePath } from "./cursor-workspaces.ts";
 
 const cursorBin = "/Applications/Cursor.app/Contents/Resources/app/bin/cursor";
 
@@ -69,6 +71,26 @@ export function readAgentRun(stdout: string): { text: string; writes: AgentWrite
   }
   if (!events.some((event) => isAgentEvent(event))) return { text: raw, writes: [] };
   return fromEvents(events);
+}
+
+export function readCursorAccessToken(databasePath: string): string {
+  let db: DatabaseSync | null = null;
+  try {
+    db = new DatabaseSync(databasePath, { readOnly: true });
+    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get("cursorAuth/accessToken") as { value?: unknown } | undefined;
+    const token = typeof row?.value === "string" ? row.value.trim() : "";
+    return token.startsWith("ey") ? token : "";
+  } catch {
+    return "";
+  } finally {
+    db?.close();
+  }
+}
+
+export function agentEnvironment(base: NodeJS.ProcessEnv, token: string): NodeJS.ProcessEnv {
+  const env = { ...base };
+  if (!env.CURSOR_API_KEY && !env.CURSOR_AUTH_TOKEN && token) env.CURSOR_AUTH_TOKEN = token;
+  return env;
 }
 
 export function resolveAgentLaunch(): { command: string; prefix: string[] } {
@@ -141,7 +163,8 @@ function runCursorAgent(request: { repoPath: string; prompt: string; args: strin
   const launch = resolveAgentLaunch();
   const args = [...launch.prefix, ...request.args];
   return new Promise((resolve, reject) => {
-    const child = spawn(launch.command, args, { cwd: request.repoPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const env = agentEnvironment(process.env, readCursorAccessToken(cursorRecentStatePath()));
+    const child = spawn(launch.command, args, { cwd: request.repoPath, env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
@@ -195,9 +218,13 @@ function fromEvents(events: unknown[]): { text: string; writes: AgentWrite[] } {
     }
     if (record.type !== "tool_call") continue;
     const extracted = extractWrite(record.tool_call);
-    if (!extracted?.path) continue;
     const callId = typeof record.call_id === "string" ? record.call_id : `anon-${order.length}`;
     const applied = record.subtype === "completed" && toolSuccess(record.tool_call);
+    if (!extracted?.path) {
+      const prev = byCall.get(callId);
+      if (prev && applied) byCall.set(callId, { ...prev, applied: true });
+      continue;
+    }
     const prev = byCall.get(callId);
     const next: AgentWrite = {
       path: extracted.path || prev?.path || "",
@@ -209,7 +236,7 @@ function fromEvents(events: unknown[]): { text: string; writes: AgentWrite[] } {
     if (!prev) order.push(callId);
     byCall.set(callId, next);
   }
-  const editMessage = [...messages].reverse().find((item) => /动作[:：]\s*修改/.test(item));
+  const editMessage = [...messages].reverse().find((item) => /动作[:：]\s*修改/.test(item) || /```/.test(item));
   const text = (editMessage || result || messages.join("\n")).trim();
   return { text, writes: order.map((id) => byCall.get(id)).filter((item): item is AgentWrite => Boolean(item?.path)) };
 }
@@ -232,6 +259,8 @@ function collectMessageText(value: unknown, parts: string[]): void {
 function extractWrite(call: unknown): { path: string; contents?: string; oldText?: string; newText?: string } | null {
   if (!call || typeof call !== "object") return null;
   const record = call as Record<string, unknown>;
+  const nested = oneofWrite(record);
+  if (nested) return nested;
   const fn = record.function;
   if (fn && typeof fn === "object") {
     const name = (fn as { name?: unknown }).name;
@@ -246,6 +275,18 @@ function extractWrite(call: unknown): { path: string; contents?: string; oldText
     if (found) return found;
   }
   return null;
+}
+
+function oneofWrite(record: Record<string, unknown>): { path: string; contents?: string; oldText?: string; newText?: string } | null {
+  const tool = record.tool;
+  if (!tool || typeof tool !== "object") return null;
+  const body = tool as { case?: unknown; value?: unknown };
+  const name = typeof body.case === "string" ? body.case : "";
+  if (!/write|edit|replace|patch/i.test(name)) return null;
+  const value = body.value && typeof body.value === "object" ? body.value as Record<string, unknown> : null;
+  if (!value) return null;
+  const args = value.args && typeof value.args === "object" ? value.args as Record<string, unknown> : value;
+  return fieldsFrom(args);
 }
 
 function parseArgs(value: unknown): Record<string, unknown> | null {
@@ -264,7 +305,7 @@ function parseArgs(value: unknown): Record<string, unknown> | null {
 function fieldsFrom(args: Record<string, unknown>): { path: string; contents?: string; oldText?: string; newText?: string } | null {
   const path = firstString(args, ["path", "file_path", "filePath", "target_file", "targetFile"]);
   if (!path) return null;
-  const contents = firstString(args, ["fileText", "contents", "content", "file_text"]);
+  const contents = firstString(args, ["fileText", "contents", "content", "file_text", "streamContent"]);
   const oldText = firstString(args, ["old_string", "oldString", "old_text", "oldText"]);
   const newText = firstString(args, ["new_string", "newString", "new_text", "newText"]);
   if (contents === undefined && (oldText === undefined || newText === undefined)) return null;
@@ -286,6 +327,7 @@ function toolSuccess(call: unknown): boolean {
     const current = stack.pop();
     if (!current || typeof current !== "object" || seen.has(current)) continue;
     seen.add(current);
+    if ("case" in current && (current as { case?: unknown }).case === "success") return true;
     if ("success" in current && (current as { success?: unknown }).success) return true;
     for (const value of Object.values(current)) {
       if (value && typeof value === "object") stack.push(value);

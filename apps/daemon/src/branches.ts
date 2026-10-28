@@ -40,6 +40,15 @@ export async function listLocalBranches(cwd: string): Promise<string[]> {
   return text.split("\n").map((line) => line.trim()).filter(Boolean);
 }
 
+export async function commitTrackedEdits(cwd: string, message: string): Promise<boolean> {
+  const porcelain = await runGit(cwd, ["status", "--porcelain"]);
+  const tracked = porcelain.split("\n").filter((line) => line && !line.startsWith("??"));
+  if (!tracked.length) return false;
+  await runGit(cwd, ["add", "-u"]);
+  await runGit(cwd, ["commit", "-m", message]);
+  return true;
+}
+
 export async function checkoutBranch(cwd: string, name: string): Promise<void> {
   const branch = assertBranchName(name);
   const branches = await listLocalBranches(cwd);
@@ -65,6 +74,7 @@ export async function renameBranch(cwd: string, from: string, to: string): Promi
 export async function mergeFastForward(cwd: string, target: string, source: string): Promise<void> {
   const into = assertBranchName(target);
   const from = assertBranchName(source);
+  await commitTrackedEdits(cwd, "采纳评审评论中的修改。");
   const current = (await runGit(cwd, ["branch", "--show-current"])).trim();
   await runGit(cwd, ["switch", "--", into]);
   try {
@@ -80,6 +90,7 @@ export async function mergeBranch(cwd: string, target: string, source: string): 
   if (into === from) return;
   const branches = await listLocalBranches(cwd);
   if (!branches.includes(into) || !branches.includes(from)) throw new Error("没有这个本地分支");
+  await commitTrackedEdits(cwd, "采纳评审评论中的修改。");
   const current = (await runGit(cwd, ["branch", "--show-current"])).trim();
   await runGit(cwd, ["switch", "--", into]);
   let failed: unknown;
