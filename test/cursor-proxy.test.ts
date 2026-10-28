@@ -40,6 +40,14 @@ test("要求修改时允许写入，并从流里取出未执行的写文件内�
   assert.equal(applied.writes[0]?.applied, true);
 });
 
+test("结果只说改好时，仍保留前面代码块里的修改", () => {
+  const run = readAgentRun([
+    JSON.stringify({ type: "assistant", message: { content: [{ text: "可以。\n```ts\nreturn listLocalBranches(cwd);\n```" }] } }),
+    JSON.stringify({ type: "result", result: "已经改好了。" }),
+  ].join("\n"));
+  assert.match(run.text, /return listLocalBranches\(cwd\);/);
+});
+
 test("Cursor 实际的 case/value 工具结果也能取出未落盘的修改", () => {
   const denied = readAgentRun([
     JSON.stringify({ type: "assistant", message: { content: [{ text: "好的。" }] } }),

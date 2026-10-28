@@ -213,7 +213,7 @@ function fromEvents(events: unknown[]): { text: string; writes: AgentWrite[] } {
     if (!prev) order.push(callId);
     byCall.set(callId, next);
   }
-  const editMessage = [...messages].reverse().find((item) => /动作[:：]\s*修改/.test(item));
+  const editMessage = [...messages].reverse().find((item) => /动作[:：]\s*修改/.test(item) || /```/.test(item));
   const text = (editMessage || result || messages.join("\n")).trim();
   return { text, writes: order.map((id) => byCall.get(id)).filter((item): item is AgentWrite => Boolean(item?.path)) };
 }

@@ -585,18 +585,6 @@ ${near ? `文件中选中范围及其上文：\n${near}\n\n` : ""}${prior ? `同
 ${userTurn(lines, comment)}`;
 }
 
-function retryEditPrompt(lines: CodeLine[], comment: string, near: string): string {
-  return `上一次没有给出可写入的代码。现在只输出替换选中范围的完整代码。
-第一行必须是：动作：修改
-接着是单独一行：说明：
-然后用一句话说明。
-接着是单独一行：代码：
-然后写出替换后的完整代码。不要说已经改好。
-
-${near ? `文件中选中范围及其上文：\n${near}\n\n` : ""}评论和选中的代码：
-${userTurn(lines, comment)}`;
-}
-
 function neighborhood(root: string, lines: CodeLine[]): string {
   const group = selectionAnchors(lines)[0];
   if (!root || !group) return "";
@@ -615,9 +603,53 @@ function neighborhood(root: string, lines: CodeLine[]): string {
 function resolveEdit(lines: CodeLine[], comment: string, reply: string): CommentAction {
   const parsed = reply ? parseCommentAction(reply) : { kind: "reply" as const, text: "" };
   if (!commentRequestsEdit(comment) || parsed.kind === "edit") return parsed;
-  const code = selectionReplacement(lines, comment, reply);
+  const code = selectionReplacement(lines, comment, reply) ?? usableReplacement(lines, reply);
   if (!code) return parsed;
-  return { kind: "edit", text: parsed.text.trim() || "已按评论替换选中代码。", code };
+  const note = parsed.text.trim();
+  const prose = note && note !== reply.trim() ? note : "已按评论替换选中代码。";
+  return { kind: "edit", text: prose, code };
+}
+
+function codeOnlyPrompt(lines: CodeLine[], comment: string, near: string): string {
+  return `按评论修改选中代码。只输出修改后的完整代码，不要解释，不要标题，不要写「动作」或「说明」。
+可以只包在一个代码块里。输出必须能替换选中的那些行。
+
+${near ? `文件中选中范围及其上文：\n${near}\n\n` : ""}评论和选中的代码：
+${userTurn(lines, comment)}`;
+}
+
+function usableReplacement(lines: CodeLine[], raw: string): string | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const parsed = parseCommentAction(text);
+  if (parsed.kind === "edit" && parsed.code.trim()) return parsed.code.replace(/\s+$/, "");
+  const fences = [...text.matchAll(/```[^\n]*\n([\s\S]*?)\n```/g)];
+  const fenced = (fences.at(-1)?.[1] ?? "").replace(/\s+$/, "");
+  if (fenced && !isProse(fenced)) return fenced;
+  const bare = unwrapFence(text).replace(/\s+$/, "");
+  if (bare && !isProse(bare) && looksLikeRewrite(lines, bare)) return bare;
+  return null;
+}
+
+function isProse(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (/无法修改|不能修改|没有可替换|抱歉/.test(trimmed) && !/[=;{}]/.test(trimmed)) return true;
+  const rows = trimmed.split("\n");
+  if (rows.length === 1 && /[。！？]$/.test(trimmed) && !/[=;{}#]/.test(trimmed)) return true;
+  const chinese = (trimmed.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const symbols = (trimmed.match(/[=;{}()[\].#]/g) ?? []).length;
+  return chinese > trimmed.length * 0.45 && symbols < 2;
+}
+
+function looksLikeRewrite(lines: CodeLine[], code: string): boolean {
+  const rows = code.split("\n");
+  if (!rows.some((row) => row.trim()) || rows.length > lines.length + 12) return false;
+  const original = lines.map((line) => (line.text === " " ? "" : line.text)).join("\n");
+  const tokens = original.match(/[A-Za-z_][\w$.-]{2,}/g) ?? [];
+  const shared = tokens.filter((token) => code.includes(token)).length;
+  if (shared >= 1) return true;
+  return rows.length > 1 && /[=;{}@#]/.test(code);
 }
 
 function plainReplacement(lines: CodeLine[], raw: string): string | null {
@@ -690,7 +722,7 @@ async function runComment(
   if (wantsEdit && action.kind !== "edit" && !writable(run.writes) && !modelFailed) {
     report("revise", "正在根据评论整理改动");
     try {
-      const again = await completeRun(retryEditPrompt(lines, comment, near), true, root);
+      const again = await completeRun(codeOnlyPrompt(lines, comment, near), false, root);
       const againReply = again.text.trim();
       const againAction = resolveEdit(lines, comment, againReply);
       if (againAction.kind === "edit") {

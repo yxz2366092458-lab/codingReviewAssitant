@@ -308,6 +308,40 @@ test("提问只答复，进度停在正在回答，不写文件", async () => {
   }
 });
 
+test("修改评论只给了代码块时，也会写入选中行", async () => {
+  const root = mkdtempSync(join(tmpdir(), "review-fence-"));
+  const file = join(root, "a.ts");
+  const original = "export function isReleaseBranch(name: string): boolean {\n  return name === \"release\";\n}\n";
+  writeFileSync(file, original);
+  const db = new DatabaseSync(":memory:");
+  const replacement = "export function isReleaseBranch(name: string): boolean {\n  return true;\n}";
+  const proxy = await startCursorProxy({
+    repoPath: root,
+    run: async () => `已经按你的要求改好了。\n\`\`\`ts\n${replacement}\n\`\`\``,
+  });
+  useCursorProxy({ url: proxy.url, token: proxy.token });
+  try {
+    const result = await explainInSession(
+      db,
+      "repo",
+      "session",
+      [
+        { path: "a.ts", side: "head", line: 1, text: "export function isReleaseBranch(name: string): boolean {" },
+        { path: "a.ts", side: "head", line: 2, text: "  return name === \"release\";" },
+        { path: "a.ts", side: "head", line: 3, text: "}" },
+      ],
+      "这里不要因为分支名阻塞用户",
+      undefined,
+      root,
+    );
+    assert.equal(result.edited, true);
+    assert.equal(readFileSync(file, "utf8"), `${replacement}\n`);
+  } finally {
+    useCursorProxy(null);
+    await proxy.close();
+  }
+});
+
 test("改不动时进度以失败原因结束", async () => {
   const root = mkdtempSync(join(tmpdir(), "review-fail-"));
   const file = join(root, "a.ts");
