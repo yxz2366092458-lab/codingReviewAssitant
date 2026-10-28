@@ -22,14 +22,53 @@ export function cursorProxyTarget(): ProxyTarget {
   return current;
 }
 
+export type AgentWrite = {
+  path: string;
+  contents?: string;
+  oldText?: string;
+  newText?: string;
+  applied: boolean;
+};
+
 export function promptInput(body: unknown): string {
   if (!body || typeof body !== "object") return "";
   const input = (body as { input?: unknown }).input;
   return typeof input === "string" ? input.trim() : "";
 }
 
-export function agentArgs(repoPath: string, prompt: string): string[] {
+export function requestWrite(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  return (body as { write?: unknown }).write === true;
+}
+
+export function requestRepo(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const repoPath = (body as { repoPath?: unknown }).repoPath;
+  return typeof repoPath === "string" && repoPath.trim() ? repoPath.trim() : fallback;
+}
+
+export function agentArgs(repoPath: string, prompt: string, write = false): string[] {
+  if (write) {
+    return ["-p", "--trust", "--force", "--output-format", "stream-json", "--workspace", repoPath, prompt];
+  }
   return ["-p", "--mode", "ask", "--trust", "--output-format", "text", "--workspace", repoPath, prompt];
+}
+
+export function readAgentRun(stdout: string): { text: string; writes: AgentWrite[] } {
+  const raw = stdout.trim();
+  if (!raw) return { text: "", writes: [] };
+  const events: unknown[] = [];
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      events.push(JSON.parse(trimmed));
+    } catch {
+      continue;
+    }
+  }
+  if (!events.some((event) => isAgentEvent(event))) return { text: raw, writes: [] };
+  return fromEvents(events);
 }
 
 export function resolveAgentLaunch(): { command: string; prefix: string[] } {
@@ -43,7 +82,7 @@ export function resolveAgentLaunch(): { command: string; prefix: string[] } {
 
 export async function startCursorProxy(options: { repoPath: string; run?: AgentRun }): Promise<ProxyTarget & { close: () => Promise<void> }> {
   const token = randomBytes(32).toString("hex");
-  const run = options.run ?? ((request) => runCursorAgent(request.repoPath, request.prompt));
+  const run = options.run ?? ((request) => runCursorAgent(request));
   let chain: Promise<void> = Promise.resolve();
   const server = createServer(async (req, res) => {
     try {
@@ -55,13 +94,17 @@ export async function startCursorProxy(options: { repoPath: string; run?: AgentR
         sendJson(res, 401, { error: "未授权" });
         return;
       }
-      const prompt = promptInput(await readJson(req));
+      const body = await readJson(req);
+      const prompt = promptInput(body);
       if (!prompt) {
         sendJson(res, 400, { error: "没有要解释的内容" });
         return;
       }
-      const text = await enqueue(() => run({ repoPath: options.repoPath, prompt, args: agentArgs(options.repoPath, prompt) }));
-      sendJson(res, 200, { output_text: text });
+      const write = requestWrite(body);
+      const repoPath = requestRepo(body, options.repoPath);
+      const text = await enqueue(() => run({ repoPath, prompt, args: agentArgs(repoPath, prompt, write) }));
+      const parsed = readAgentRun(text);
+      sendJson(res, 200, { output_text: parsed.text, writes: parsed.writes });
     } catch (error) {
       const message = error instanceof Error && error.message.trim() ? error.message.trim() : "总结失败";
       sendJson(res, 502, { error: message.slice(0, 500) });
@@ -94,11 +137,11 @@ export async function startCursorProxy(options: { repoPath: string; run?: AgentR
   };
 }
 
-function runCursorAgent(repoPath: string, prompt: string): Promise<string> {
+function runCursorAgent(request: { repoPath: string; prompt: string; args: string[] }): Promise<string> {
   const launch = resolveAgentLaunch();
-  const args = [...launch.prefix, ...agentArgs(repoPath, prompt)];
+  const args = [...launch.prefix, ...request.args];
   return new Promise((resolve, reject) => {
-    const child = spawn(launch.command, args, { cwd: repoPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(launch.command, args, { cwd: request.repoPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
@@ -129,6 +172,126 @@ function runCursorAgent(repoPath: string, prompt: string): Promise<string> {
       else resolve(text);
     });
   });
+}
+
+function isAgentEvent(event: unknown): boolean {
+  if (!event || typeof event !== "object") return false;
+  const type = (event as { type?: unknown }).type;
+  return type === "result" || type === "assistant" || type === "tool_call" || type === "system";
+}
+
+function fromEvents(events: unknown[]): { text: string; writes: AgentWrite[] } {
+  const messages: string[] = [];
+  let result = "";
+  const byCall = new Map<string, AgentWrite>();
+  const order: string[] = [];
+  for (const event of events) {
+    if (!event || typeof event !== "object") continue;
+    const record = event as Record<string, unknown>;
+    if (record.type === "result" && typeof record.result === "string") result = record.result;
+    if (record.type === "assistant") {
+      const text = messageText(record.message);
+      if (text) messages.push(text);
+    }
+    if (record.type !== "tool_call") continue;
+    const extracted = extractWrite(record.tool_call);
+    if (!extracted?.path) continue;
+    const callId = typeof record.call_id === "string" ? record.call_id : `anon-${order.length}`;
+    const applied = record.subtype === "completed" && toolSuccess(record.tool_call);
+    const prev = byCall.get(callId);
+    const next: AgentWrite = {
+      path: extracted.path || prev?.path || "",
+      contents: extracted.contents ?? prev?.contents,
+      oldText: extracted.oldText ?? prev?.oldText,
+      newText: extracted.newText ?? prev?.newText,
+      applied: Boolean(prev?.applied || applied),
+    };
+    if (!prev) order.push(callId);
+    byCall.set(callId, next);
+  }
+  const editMessage = [...messages].reverse().find((item) => /动作[:：]\s*修改/.test(item));
+  const text = (editMessage || result || messages.join("\n")).trim();
+  return { text, writes: order.map((id) => byCall.get(id)).filter((item): item is AgentWrite => Boolean(item?.path)) };
+}
+
+function messageText(message: unknown): string {
+  const parts: string[] = [];
+  collectMessageText(message, parts);
+  return parts.join("\n").trim();
+}
+
+function collectMessageText(value: unknown, parts: string[]): void {
+  if (!value || typeof value !== "object") return;
+  const record = value as { text?: unknown; content?: unknown };
+  if (typeof record.text === "string") parts.push(record.text);
+  if (typeof record.content === "string") parts.push(record.content);
+  if (!Array.isArray(record.content)) return;
+  for (const block of record.content) collectMessageText(block, parts);
+}
+
+function extractWrite(call: unknown): { path: string; contents?: string; oldText?: string; newText?: string } | null {
+  if (!call || typeof call !== "object") return null;
+  const record = call as Record<string, unknown>;
+  const fn = record.function;
+  if (fn && typeof fn === "object") {
+    const name = (fn as { name?: unknown }).name;
+    const args = parseArgs((fn as { arguments?: unknown }).arguments);
+    if (typeof name === "string" && /write|edit|replace|patch/i.test(name) && args) return fieldsFrom(args);
+  }
+  for (const [key, value] of Object.entries(record)) {
+    if (!/write|edit|replace|patch/i.test(key) || !value || typeof value !== "object") continue;
+    const args = (value as { args?: unknown }).args;
+    const source = args && typeof args === "object" ? args as Record<string, unknown> : value as Record<string, unknown>;
+    const found = fieldsFrom(source);
+    if (found) return found;
+  }
+  return null;
+}
+
+function parseArgs(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
+  }
+  return typeof value === "object" ? value as Record<string, unknown> : null;
+}
+
+function fieldsFrom(args: Record<string, unknown>): { path: string; contents?: string; oldText?: string; newText?: string } | null {
+  const path = firstString(args, ["path", "file_path", "filePath", "target_file", "targetFile"]);
+  if (!path) return null;
+  const contents = firstString(args, ["fileText", "contents", "content", "file_text"]);
+  const oldText = firstString(args, ["old_string", "oldString", "old_text", "oldText"]);
+  const newText = firstString(args, ["new_string", "newString", "new_text", "newText"]);
+  if (contents === undefined && (oldText === undefined || newText === undefined)) return null;
+  return { path, contents, oldText, newText };
+}
+
+function firstString(args: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+function toolSuccess(call: unknown): boolean {
+  const stack = [call];
+  const seen = new Set<unknown>();
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    if ("success" in current && (current as { success?: unknown }).success) return true;
+    for (const value of Object.values(current)) {
+      if (value && typeof value === "object") stack.push(value);
+    }
+  }
+  return false;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
