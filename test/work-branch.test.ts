@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { commitTrackedEdits, mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
-import { admitSession, composerName, currentSessionId, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readWorkBranches, sessionBranchNames, sessionPhase, UnmatchedWorkBranchError, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
+import { admitSession, claimWorkBranch, composerName, currentSessionId, developmentSlug, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readWorkBranches, sessionBranchNames, sessionPhase, unmatchedBranchMessage, UnmatchedWorkBranchError, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
   execFileSync("git", args, { cwd });
@@ -346,5 +346,119 @@ test("对不上的切片分支不会回落到其他会话", async () => {
   assert.doesNotMatch(releaseFiles, /old\.txt/);
   assert.doesNotMatch(releaseFiles, /api\.txt/);
   assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), "feature-api");
+});
+
+test("认领 dev 分支后能匹配需求会话并走原来的合并", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-claim-dev-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "release"]);
+  git(cwd, ["branch", "req/old"]);
+  git(cwd, ["branch", "dev/old"]);
+  const slug = "abcd1234ef567890";
+  assert.equal(developmentSlug(`dev/${slug}`), slug);
+  git(cwd, ["branch", `req/${slug}`]);
+  git(cwd, ["switch", "-c", `dev/${slug}`]);
+  writeFileSync(join(cwd, "claim.txt"), "claim\n");
+  git(cwd, ["add", "claim.txt"]);
+  git(cwd, ["commit", "-m", "claim"]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    admitted INTEGER NOT NULL DEFAULT 0,
+    requirement_slice TEXT,
+    merge_target TEXT,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    "old-session",
+    "req/old",
+    "dev/old",
+  );
+  assert.equal(readWorkBranches(db, "repo", `dev/${slug}`), null);
+  await assert.rejects(() => mergeWorkBranches(db, cwd, "repo", `dev/${slug}`), UnmatchedWorkBranchError);
+  const claimed = await claimWorkBranch(db, cwd, "repo", `dev/${slug}`, "", "");
+  assert.equal(claimed.sessionId, slug);
+  assert.equal(claimed.development, `dev/${slug}`);
+  assert.equal(claimed.requirement, `req/${slug}`);
+  const matched = readWorkBranches(db, "repo", `dev/${slug}`);
+  assert.equal(matched?.requirement, `req/${slug}`);
+  assert.equal(matched?.development, `dev/${slug}`);
+  await mergeWorkBranches(db, cwd, "repo", `dev/${slug}`);
+  assert.equal(execFileSync("git", ["rev-parse", `req/${slug}`], { cwd }).toString(), execFileSync("git", ["rev-parse", `dev/${slug}`], { cwd }).toString());
+  await mergeRequirementIntoBranch(db, cwd, "repo", `dev/${slug}`, "release");
+  assert.match(execFileSync("git", ["ls-tree", "-r", "--name-only", "release"], { cwd }).toString(), /claim\.txt/);
+  assert.doesNotMatch(execFileSync("git", ["ls-tree", "-r", "--name-only", "req/old"], { cwd }).toString(), /claim\.txt/);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd }).toString().trim(), `dev/${slug}`);
+});
+
+test("没有配对需求分支时，认领会按编号补一条", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-claim-create-req-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  const slug = "fedcba9876543210";
+  git(cwd, ["switch", "-c", `dev/${slug}`]);
+  const db = new DatabaseSync(":memory:");
+  const claimed = await claimWorkBranch(db, cwd, "repo", `dev/${slug}`, "", "");
+  assert.equal(claimed.requirement, `req/${slug}`);
+  assert.match(execFileSync("git", ["branch", "--format=%(refname:short)"], { cwd }).toString(), new RegExp(`req/${slug}`));
+  assert.equal(readWorkBranches(db, "repo", `dev/${slug}`)?.requirement, `req/${slug}`);
+});
+
+test("cursor 分支认领后能匹配，文案说明可以认领或只并进目标", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-claim-cursor-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "base\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "req/old"]);
+  git(cwd, ["branch", "dev/old"]);
+  git(cwd, ["switch", "-c", "cursor/agent-fix"]);
+  writeFileSync(join(cwd, "fix.txt"), "fix\n");
+  git(cwd, ["add", "fix.txt"]);
+  git(cwd, ["commit", "-m", "fix"]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE work_branches (
+    repo_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    requirement TEXT NOT NULL,
+    development TEXT NOT NULL,
+    PRIMARY KEY (repo_id, session_id)
+  )`);
+  db.prepare("INSERT INTO work_branches (repo_id, session_id, requirement, development) VALUES (?, ?, ?, ?)").run(
+    "repo",
+    "old-session",
+    "req/old",
+    "dev/old",
+  );
+  await assert.rejects(() => claimWorkBranch(db, cwd, "repo", "cursor/agent-fix", "", ""), /请选择或建立会话/);
+  assert.match(unmatchedBranchMessage("cursor/agent-fix"), /可以认领到一条会话/);
+  assert.match(unmatchedBranchMessage("cursor/agent-fix"), /只并进所选目标/);
+  assert.match(unmatchedBranchMessage("cursor/agent-fix", "release"), /并进了「release」/);
+  assert.match(new UnmatchedWorkBranchError("feature-api").message, /没有对应的需求会话/);
+  const session = "c39dda95-5a27-42ce-9123-194b6979821f";
+  const claimed = await claimWorkBranch(db, cwd, "repo", "cursor/agent-fix", session, "Cursor branch claim");
+  assert.equal(claimed.sessionId, session);
+  assert.equal(claimed.development, "cursor/agent-fix");
+  assert.equal(claimed.requirement, "req/Cursor-branch-claim");
+  assert.equal(readWorkBranches(db, "repo", "cursor/agent-fix")?.development, "cursor/agent-fix");
+  assert.equal(currentSessionId(db, "repo", "cursor/agent-fix"), session);
+  await mergeWorkBranches(db, cwd, "repo", "cursor/agent-fix");
+  assert.match(execFileSync("git", ["ls-tree", "-r", "--name-only", claimed.requirement], { cwd }).toString(), /fix\.txt/);
+  assert.doesNotMatch(execFileSync("git", ["ls-tree", "-r", "--name-only", "req/old"], { cwd }).toString(), /fix\.txt/);
 });
 

@@ -13,16 +13,16 @@ export function startRef(branches: string[], fallback: string): string {
   return branches.includes("release") ? "release" : fallback;
 }
 
-function runGit(cwd: string, args: string[]): Promise<string> {
-  return enqueueGit(() => retryOnIndexLock(() => runGitOnce(cwd, args)));
+function runGit(cwd: string, args: string[], timeout = 15000): Promise<string> {
+  return enqueueGit(() => retryOnIndexLock(() => runGitOnce(cwd, args, timeout)));
 }
 
-function runGitOnce(cwd: string, args: string[]): Promise<string> {
+function runGitOnce(cwd: string, args: string[], timeout = 15000): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
       args,
-      { cwd, timeout: 15000, env: { ...process.env, GIT_PAGER: "cat" } },
+      { cwd, timeout, env: { ...process.env, GIT_PAGER: "cat" } },
       (error, stdout, stderr) => {
         if (error) {
           const detail = (stderr?.toString() || stdout?.toString() || error.message).trim();
@@ -38,6 +38,73 @@ function runGitOnce(cwd: string, args: string[]): Promise<string> {
 export async function listLocalBranches(cwd: string): Promise<string[]> {
   const text = await runGit(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
   return text.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+export async function listOriginBranches(cwd: string): Promise<string[]> {
+  let text = "";
+  try {
+    text = await runGit(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"]);
+  } catch {
+    return [];
+  }
+  const names: string[] = [];
+  for (const line of text.split("\n")) {
+    const ref = line.trim();
+    if (!ref.startsWith("origin/") || ref === "origin/HEAD") continue;
+    const name = ref.slice("origin/".length);
+    if (!name) continue;
+    names.push(name);
+  }
+  return names;
+}
+
+export async function fetchOrigin(cwd: string): Promise<void> {
+  const remotes = (await runGit(cwd, ["remote"])).split("\n").map((line) => line.trim());
+  if (!remotes.includes("origin")) return;
+  await runGit(cwd, ["fetch", "--prune", "origin"], 60000);
+}
+
+export async function listBranchCandidates(
+  cwd: string,
+  refresh = false,
+): Promise<{ branches: string[]; remoteOnly: string[] }> {
+  if (refresh) await fetchOrigin(cwd);
+  const local = await listLocalBranches(cwd);
+  const present = new Set(local);
+  const remoteOnly = (await listOriginBranches(cwd))
+    .filter((name) => !present.has(name))
+    .map((name) => `origin/${name}`);
+  return { branches: [...local, ...remoteOnly], remoteOnly };
+}
+
+export async function trackOriginBranch(cwd: string, name: string): Promise<string> {
+  const branch = assertBranchName(name.trim().replace(/^origin\//, ""));
+  if ((await listLocalBranches(cwd)).includes(branch)) return branch;
+  let remote = await listOriginBranches(cwd);
+  if (!remote.includes(branch)) {
+    await fetchOrigin(cwd);
+    remote = await listOriginBranches(cwd);
+  }
+  if (!remote.includes(branch)) throw new Error("origin 上没有这个分支");
+  await runGit(cwd, ["branch", "--track", branch, `origin/${branch}`]);
+  return branch;
+}
+
+export async function materializeBranch(cwd: string, requested: string): Promise<string> {
+  const trimmed = requested.trim();
+  const localName = assertBranchName(trimmed.startsWith("origin/") ? trimmed.slice("origin/".length) : trimmed);
+  if ((await listLocalBranches(cwd)).includes(localName)) return localName;
+  return trackOriginBranch(cwd, localName);
+}
+
+export async function commitsAhead(cwd: string, ancestor: string, head: string): Promise<number | null> {
+  try {
+    await runGit(cwd, ["merge-base", "--is-ancestor", ancestor, head]);
+  } catch {
+    return null;
+  }
+  const count = Number((await runGit(cwd, ["rev-list", "--count", `${ancestor}..${head}`])).trim());
+  return Number.isFinite(count) ? count : null;
 }
 
 export async function commitTrackedEdits(cwd: string, message: string): Promise<boolean> {
