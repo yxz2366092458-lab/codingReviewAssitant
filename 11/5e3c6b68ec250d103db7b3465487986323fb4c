@@ -1,0 +1,24 @@
+test/work-branch.test.ts
+  s_fd528823e8d35d::t_b5e027b3490727 92-111
+  s_fd528823e8d35d::t_510fc4c3b682a4 8
+apps/daemon/src/branches.ts
+  s_fd528823e8d35d::t_f7cf17424ff106 43-51
+  s_fd528823e8d35d::t_c41ca9015e819b 77
+  s_fd528823e8d35d::t_dfc0b11bd1c009 93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "115e3c6b68ec250d103db7b3465487986323fb4c",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
