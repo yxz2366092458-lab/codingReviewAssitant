@@ -2,8 +2,10 @@ import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { DatabaseSync } from "node:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { cursorRecentStatePath } from "./cursor-workspaces.ts";
 
 const cursorBin = "/Applications/Cursor.app/Contents/Resources/app/bin/cursor";
 
@@ -69,6 +71,26 @@ export function readAgentRun(stdout: string): { text: string; writes: AgentWrite
   }
   if (!events.some((event) => isAgentEvent(event))) return { text: raw, writes: [] };
   return fromEvents(events);
+}
+
+export function readCursorAccessToken(databasePath: string): string {
+  let db: DatabaseSync | null = null;
+  try {
+    db = new DatabaseSync(databasePath, { readOnly: true });
+    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get("cursorAuth/accessToken") as { value?: unknown } | undefined;
+    const token = typeof row?.value === "string" ? row.value.trim() : "";
+    return token.startsWith("ey") ? token : "";
+  } catch {
+    return "";
+  } finally {
+    db?.close();
+  }
+}
+
+export function agentEnvironment(base: NodeJS.ProcessEnv, token: string): NodeJS.ProcessEnv {
+  const env = { ...base };
+  if (!env.CURSOR_API_KEY && !env.CURSOR_AUTH_TOKEN && token) env.CURSOR_AUTH_TOKEN = token;
+  return env;
 }
 
 export function resolveAgentLaunch(): { command: string; prefix: string[] } {
@@ -141,7 +163,8 @@ function runCursorAgent(request: { repoPath: string; prompt: string; args: strin
   const launch = resolveAgentLaunch();
   const args = [...launch.prefix, ...request.args];
   return new Promise((resolve, reject) => {
-    const child = spawn(launch.command, args, { cwd: request.repoPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const env = agentEnvironment(process.env, readCursorAccessToken(cursorRecentStatePath()));
+    const child = spawn(launch.command, args, { cwd: request.repoPath, env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {

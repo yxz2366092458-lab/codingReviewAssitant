@@ -342,6 +342,38 @@ test("修改评论只给了代码块时，也会写入选中行", async () => {
   }
 });
 
+test("agent 没登录时，显示登录失败而不是没有可替换代码", async () => {
+  const root = mkdtempSync(join(tmpdir(), "review-auth-fail-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "return total;\n");
+  const db = new DatabaseSync(":memory:");
+  const proxy = await startCursorProxy({
+    repoPath: root,
+    run: async () => {
+      throw new Error("Error: Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY.");
+    },
+  });
+  useCursorProxy({ url: proxy.url, token: proxy.token });
+  try {
+    await assert.rejects(
+      () => explainInSession(
+        db,
+        "repo",
+        "session",
+        [{ path: "a.ts", side: "head", line: 1, text: "return total;" }],
+        "这里不要因为分支名阻塞用户",
+        undefined,
+        root,
+      ),
+      /Cursor agent 没有登录/,
+    );
+    assert.equal(readFileSync(file, "utf8"), "return total;\n");
+  } finally {
+    useCursorProxy(null);
+    await proxy.close();
+  }
+});
+
 test("改不动时进度以失败原因结束", async () => {
   const root = mkdtempSync(join(tmpdir(), "review-fail-"));
   const file = join(root, "a.ts");

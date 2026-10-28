@@ -666,6 +666,15 @@ function writable(writes: AgentWrite[]): boolean {
   return writes.some((item) => item.applied || typeof item.contents === "string" || (typeof item.oldText === "string" && typeof item.newText === "string"));
 }
 
+function agentFailure(message: string): string {
+  if (/Authentication required|CURSOR_API_KEY|CURSOR_AUTH_TOKEN|agent login/.test(message)) {
+    return "Cursor agent 没有登录。请在终端执行 agent login 后再试。";
+  }
+  const text = message.trim();
+  if (!text || text === "总结失败" || text === "总结为空") return "没有写出可替换的代码";
+  return text.slice(0, 200);
+}
+
 export async function explainInSession(
   db: DatabaseSync,
   repoId: string,
@@ -704,6 +713,7 @@ async function runComment(
   const near = wantsEdit ? neighborhood(root, lines) : "";
   let run: { text: string; writes: AgentWrite[] } = { text: "", writes: [] };
   let modelFailed = false;
+  let agentError = "";
   if (wantsEdit) report("understand", "正在理解评论");
   else report("answer", "正在回答");
   report("agent", wantsEdit ? "正在调用 agent" : "正在回答");
@@ -716,6 +726,7 @@ async function runComment(
       throw error;
     }
     modelFailed = true;
+    agentError = message;
   }
   let reply = run.text.trim();
   let action = resolveEdit(lines, comment, reply);
@@ -742,10 +753,10 @@ async function runComment(
     if (local) action = { kind: "edit", text: action.text.trim() || "已按评论替换选中代码。", code: local };
   }
   if (!reply && action.kind === "edit") reply = action.text;
-  if (!reply && run.writes.length === 0 && action.kind !== "edit") throw new Error(wantsEdit ? "没有写出可替换的代码" : "解释失败");
+  if (!reply && run.writes.length === 0 && action.kind !== "edit") throw new Error(wantsEdit ? agentFailure(agentError) : "解释失败");
   let shown = action.text.trim();
   const plan = planFileEdits(action, reply, run.writes, wantsEdit);
-  if (wantsEdit && !plan.edited) throw new Error("没有写出可替换的代码");
+  if (wantsEdit && !plan.edited) throw new Error(agentFailure(agentError));
   let edit: { path: string; start: number; end: number; code: string } | null = null;
   if (plan.edited) report("write", "正在写入文件");
   if (plan.selection) {

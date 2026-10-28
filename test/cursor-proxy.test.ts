@@ -1,8 +1,25 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import test from "node:test";
-import { agentArgs, promptInput, readAgentRun, startCursorProxy, useCursorProxy } from "../apps/daemon/src/cursor-proxy.ts";
+import { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { agentArgs, agentEnvironment, promptInput, readAgentRun, readCursorAccessToken, startCursorProxy, useCursorProxy } from "../apps/daemon/src/cursor-proxy.ts";
 import { completePrompt, completeRun } from "../apps/daemon/src/summary-ai.ts";
+
+test("没有单独配置时，用 Cursor 已登录的令牌调用 agent", () => {
+  const env = agentEnvironment({ PATH: "/bin" }, "eyJ.test");
+  assert.equal(env.CURSOR_AUTH_TOKEN, "eyJ.test");
+  assert.equal(agentEnvironment({ CURSOR_API_KEY: "already" }, "eyJ.test").CURSOR_AUTH_TOKEN, undefined);
+  assert.equal(agentEnvironment({ CURSOR_AUTH_TOKEN: "kept" }, "eyJ.other").CURSOR_AUTH_TOKEN, "kept");
+  const dir = mkdtempSync(join(tmpdir(), "review-auth-"));
+  const db = new DatabaseSync(join(dir, "state.vscdb"));
+  db.exec("CREATE TABLE ItemTable (key TEXT, value TEXT)");
+  db.prepare("INSERT INTO ItemTable (key, value) VALUES (?, ?)").run("cursorAuth/accessToken", "eyJ.local");
+  assert.equal(readCursorAccessToken(join(dir, "state.vscdb")), "eyJ.local");
+  db.close();
+  assert.equal(readCursorAccessToken(join(dir, "missing.vscdb")), "");
+});
 
 test("从请求里取出要交给 Cursor 的原文", () => {
   assert.equal(promptInput({ input: " 解释这几行 " }), "解释这几行");
