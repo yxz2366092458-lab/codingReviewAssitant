@@ -1,0 +1,28 @@
+apps/daemon/src/cursor-proxy.ts
+  h_2a16997f34cffe 25-32,39-53,57-73,85,97-98,103-107,140,142,144,177-296
+apps/daemon/src/explain.ts
+  h_2a16997f34cffe 4-5,147,153,161-175,177-179,182-190,195-263,297-300,488,493,495,501-521,523-527,529-530,533-544
+apps/daemon/src/summary-ai.ts
+  h_2a16997f34cffe 3,59,82,85-110,118,131-135
+apps/web/app.css
+  h_2a16997f34cffe 43-44,51-52
+apps/web/app.js
+  h_2a16997f34cffe 28-31,180-183,265,363-364,370-373,375-378,412-451,457-495,499,508-509,519,521-525,531-532,536-538,625,1260-1282,1323-1330
+apps/web/index.html
+  h_2a16997f34cffe 7,85
+test/cursor-proxy.test.ts
+  h_2a16997f34cffe 4-5,13-42,53-77
+test/explain.test.ts
+  h_2a16997f34cffe 7-8,46-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "09ad6945b0758781d9ad6dd0abd46d450c80b8e5",
+  "prompts": {},
+  "humans": {
+    "h_2a16997f34cffe": {
+      "author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
