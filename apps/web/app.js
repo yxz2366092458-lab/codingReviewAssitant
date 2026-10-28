@@ -25,6 +25,10 @@ const state = {
   viewBranch: "",
   loadedExplainSession: "",
   sessions: [],
+  branchQuery: "",
+  branchChoice: "",
+  branchNames: [],
+  appliedEdit: null,
 };
 
 let events = null;
@@ -173,6 +177,10 @@ function resetView() {
   state.viewBranch = "";
   state.loadedExplainSession = "";
   state.sessions = [];
+  state.branchQuery = "";
+  state.branchChoice = "";
+  state.branchNames = [];
+  state.appliedEdit = null;
   $("source").hidden = true;
   $("diff").replaceChildren();
   connect();
@@ -254,7 +262,7 @@ async function loadPanel() {
     finalRound: gate.finalRound,
     phase: gate.phase,
     bugfix: gate.bugfix ?? "",
-    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
+    files: (diff.files ?? []).map((file) => `${file.fileId}:${file.additions}:${file.deletions}:${file.status}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
     requirement: status.requirement,
@@ -352,28 +360,22 @@ function renderSummary(gate) {
   phase.classList.toggle("development", gate.phase === "development");
   const wrap = $("decision-wrap");
   const decisions = $("decisions");
+  const typingBranch = document.activeElement instanceof HTMLInputElement && document.activeElement.id === "branch-search";
+  const branchCaret = typingBranch ? document.activeElement.selectionStart : null;
   decisions.replaceChildren();
   const show = gate.state === "awaiting_release" || gate.state === "awaiting_review";
   wrap.hidden = !show;
   if (!show || !slice) return;
   if (gate.state === "awaiting_review") {
-    const select = document.createElement("select");
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "选择分支";
-    select.append(placeholder);
-    decisions.append(select);
-    decisions.append(decision("核验通过", () => verify(slice.sliceId, select)));
-    void fillBranches(select).catch(showError);
+    const picker = renderBranchPicker(typingBranch, branchCaret, "选择分支");
+    decisions.append(picker);
+    decisions.append(decision("核验通过", () => verify(slice.sliceId, picker.querySelector("select"))));
+    void fillBranches(picker.querySelector("select")).catch(showError);
   } else if (gate.phase === "requirement") {
-    const select = document.createElement("select");
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "合并目标";
-    select.append(placeholder);
-    decisions.append(select);
-    decisions.append(decision("需求准入", () => admit(slice.sliceId, select)));
-    void fillBranches(select, gate.mergeTarget || "").catch(showError);
+    const picker = renderBranchPicker(typingBranch, branchCaret, "合并目标");
+    decisions.append(picker);
+    decisions.append(decision("需求准入", () => admit(slice.sliceId, picker.querySelector("select"))));
+    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError)
   } else {
     decisions.append(decision("放行", () => act("release", slice.sliceId)));
   }
@@ -407,22 +409,94 @@ async function act(name, sliceId) {
   await refresh();
 }
 
-async function fillBranches(select, preferred = "") {
-  const { branches } = await api(`/repos/${state.repoId}/branches`);
-  if (!select.isConnected) return;
-  const chosen = select.value;
-  for (const name of branches) {
+function renderBranchPicker(wasTyping, caret, emptyLabel = "选择分支") {
+  const picker = document.createElement("div");
+  picker.className = "branch-picker";
+  const search = document.createElement("input");
+  search.id = "branch-search";
+  search.type = "search";
+  search.placeholder = "搜索或新建分支";
+  search.spellcheck = false;
+  search.autocomplete = "off";
+  search.value = state.branchQuery;
+  const select = document.createElement("select");
+  select.dataset.emptyLabel = emptyLabel;
+  select.addEventListener("change", () => {
+    state.branchChoice = select.value;
+  });
+  search.addEventListener("input", () => {
+    state.branchQuery = search.value;
+    renderBranchOptions(select);
+  });
+  picker.append(search, select);
+  renderBranchOptions(select);
+  if (wasTyping) {
+    search.focus();
+    if (caret !== null) search.setSelectionRange(caret, caret);
+  }
+  return picker;
+}
+
+function renderBranchOptions(select) {
+  const query = state.branchQuery.trim();
+  const queryLower = query.toLowerCase();
+  const chosen = state.branchChoice;
+  const names = state.branchNames.filter((name) => name.toLowerCase().includes(queryLower));
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  const emptyLabel = select.dataset.emptyLabel || "选择分支";
+  placeholder.textContent = query && names.length === 0 ? "没有匹配的分支" : emptyLabel;
+  select.append(placeholder);
+  for (const name of names) {
     const option = document.createElement("option");
     option.value = name;
     option.textContent = name;
     select.append(option);
   }
-  if (branches.includes(chosen)) select.value = chosen;
-  else if (branches.includes(preferred)) select.value = preferred;
+  if (query && !state.branchNames.includes(query)) {
+    const create = document.createElement("option");
+    create.value = `__create__:${query}`;
+    create.textContent = `新建分支 ${query}`;
+    select.append(create);
+  }
+  if (names.includes(chosen) || chosen.startsWith("__create__:")) select.value = chosen;
+  else select.value = "";
+}
+
+async function fillBranches(select, preferred = "") {
+  const { branches } = await api(`/repos/${state.repoId}/branches`);
+  if (!select?.isConnected) return;
+  state.branchNames = branches ?? [];
+  if (!state.branchChoice && preferred && state.branchNames.includes(preferred)) {
+    state.branchChoice = preferred;
+  }
+  renderBranchOptions(select);
+}
+
+async function ensureBranch(select) {
+  let branch = select.value.trim();
+  if (branch.startsWith("__create__:")) branch = branch.slice("__create__:".length).trim();
+  if (!branch && state.branchQuery.trim() && !state.branchNames.includes(state.branchQuery.trim())) {
+    branch = state.branchQuery.trim();
+  }
+  if (!branch) return "";
+  if (!state.branchNames.includes(branch)) {
+    await api(`/repos/${state.repoId}/branches`, {
+      method: "POST",
+      body: JSON.stringify({ name: branch }),
+    });
+    state.branchNames = [...state.branchNames, branch];
+    state.branchChoice = branch;
+    state.branchQuery = branch;
+    renderBranchOptions(select);
+    select.value = branch;
+  }
+  return branch;
 }
 
 async function admit(sliceId, select) {
-  const branch = select.value.trim();
+  const branch = await ensureBranch(select);
   if (!branch) {
     showNotice("需求准入前要先绑定合并目标分支。");
     return;
@@ -431,6 +505,8 @@ async function admit(sliceId, select) {
     method: "POST",
     body: JSON.stringify({ branch }),
   });
+  state.branchChoice = "";
+  state.branchQuery = "";
   await act("release", sliceId);
 }
 
@@ -438,24 +514,28 @@ let verifying = false;
 
 async function verify(sliceId, select) {
   if (verifying) return;
-  const branch = select.value.trim();
-  if (!branch) {
-    showNotice("请选择要合并过去的分支。");
-    return;
-  }
   verifying = true;
   select.disabled = true;
-  for (const button of $("decisions").querySelectorAll("button")) button.disabled = true;
+  for (const field of $("decisions").querySelectorAll("button, input, select")) field.disabled = true;
   try {
+    const branch = await ensureBranch(select);
+    if (!branch) {
+      showNotice("请选择要合并过去的分支。");
+      return;
+    }
     await api(`/repos/${state.repoId}/gate/ack`, {
       method: "POST",
       body: JSON.stringify({ sliceId, branch }),
     });
     state.sliceId = "";
+    state.branchChoice = "";
+    state.branchQuery = "";
     await refresh();
   } finally {
     verifying = false;
-    if (select.isConnected) select.disabled = false;
+    if (select.isConnected) {
+      for (const field of $("decisions").querySelectorAll("button, input, select")) field.disabled = false;
+    }
   }
 }
 
@@ -542,6 +622,7 @@ async function renderPatch() {
   if (state.mode === "unified") diff.append(unified(patch));
   else diff.append(split(patch));
   paintPicked();
+  paintAppliedEdit();
   placeExplainBars();
 }
 
@@ -1176,6 +1257,29 @@ function rememberThread(result, group) {
   if (result.sessionId) state.loadedExplainSession = result.sessionId;
 }
 
+function paintAppliedEdit() {
+  const edit = state.appliedEdit;
+  if (!edit?.path) return;
+  const rows = [...document.querySelectorAll("#diff .line")].filter((row) => row.dataset.path === edit.path && row.dataset.side === "head");
+  if (edit.code && edit.start) {
+    const lines = String(edit.code).replace(/\s+$/, "").split("\n");
+    const selected = rows.filter((row) => {
+      const line = Number(row.dataset.line);
+      return line >= edit.start && line <= edit.end;
+    });
+    selected.forEach((row, index) => {
+      const code = row.querySelector("span:last-child");
+      if (!code) return;
+      if (index === selected.length - 1 && lines.length > selected.length) code.textContent = lines.slice(index).join("\n") || " ";
+      else code.textContent = lines[index] ?? " ";
+    });
+  }
+  const filePath = $("file-path");
+  if (filePath.textContent.startsWith(edit.path) && !filePath.textContent.includes("已写入工作区")) {
+    filePath.textContent = `${filePath.textContent} · 已写入工作区`;
+  }
+}
+
 function explainPending() {
   const row = document.createElement("p");
   row.className = "explain-pending";
@@ -1216,7 +1320,14 @@ async function sendComment(group, text) {
     rememberThread(result, group);
     delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
-    placeExplainBars();
+    if (result.edited) {
+      state.appliedEdit = result.edit?.path ? result.edit : { path: group.path, start: group.start, end: group.end, code: "" };
+      showNotice(state.appliedEdit.path ? `已写入 ${state.appliedEdit.path}` : "已写入工作区");
+      state.signature = "";
+      await refresh();
+    } else {
+      placeExplainBars();
+    }
   } catch (error) {
     delete state.pendingExplain[key];
     placeExplainBars();

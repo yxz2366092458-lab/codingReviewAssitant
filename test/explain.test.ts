@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { applySelectionEdit, explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, parseCommentAction, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { applyAgentWrites, applySelectionEdit, explainPrompt, explainSelection, loadThreads, loadTurns, normalizeLines, parseCommentAction, planFileEdits, readAnchor, remember, resolveExplainSession, saveExplainMode, saveThread, saveTurns, selectionAnchors, sessionPrompt, threadFor } from "../apps/daemon/src/explain.ts";
+import { readAgentRun } from "../apps/daemon/src/cursor-proxy.ts";
 import { currentSessionId, listWorkSessions, readSessionBranches } from "../apps/daemon/src/work-branch.ts";
 
 const lines = [{ path: "apps/web/app.js", side: "head" as const, line: 12, text: "return total;" }];
@@ -42,6 +43,48 @@ test("评论动作能解析成答复或修改，格式不对就当作答复", ()
   const broken = "请把这行改成 return 0;";
   assert.deepEqual(parseCommentAction(broken), { kind: "reply", text: broken });
   assert.equal(parseCommentAction("动作：修改\n说明：\n还没给出代码。").kind, "reply");
+  const wrapped = parseCommentAction("好的，我来改。\n动作：修改\r\n说明：\r\n改成直接返回。\r\n代码：\r\n```ts\r\nreturn 0;\r\n```");
+  assert.deepEqual(wrapped, { kind: "edit", text: "改成直接返回。", code: "return 0;" });
+  const fenceOnly = parseCommentAction("把选中的行改为：\n```\nreturn 0;\n```");
+  assert.equal(fenceOnly.kind, "edit");
+  if (fenceOnly.kind === "edit") assert.equal(fenceOnly.code, "return 0;");
+});
+
+test("最后一句声称改好时，仍用前面的修改块写文件", () => {
+  const stream = [
+    JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "动作：修改\n说明：\n改成直接返回。\n代码：\nreturn 0;" }] } }),
+    JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "已经改好了。" }] } }),
+    JSON.stringify({ type: "result", result: "动作：修改\n说明：\n改成直接返回。\n代码：\nreturn 0;已经改好了。" }),
+  ].join("\n");
+  const run = readAgentRun(stream);
+  const action = parseCommentAction(run.text);
+  assert.equal(action.kind, "edit");
+  if (action.kind !== "edit") return;
+  assert.equal(action.code, "return 0;");
+  const root = mkdtempSync(join(tmpdir(), "review-edit-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "const a = 1;\nreturn total;\n");
+  const plan = planFileEdits(action, run.text, run.writes);
+  assert.equal(plan.selection, true);
+  applySelectionEdit(root, [{ path: "a.ts", side: "head", line: 2, text: "return total;" }], action.code);
+  assert.equal(readFileSync(file, "utf8"), "const a = 1;\nreturn 0;\n");
+});
+
+test("工具调用里的修改没落盘时，由评审程序写入", () => {
+  const root = mkdtempSync(join(tmpdir(), "review-write-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "return total;\n");
+  const action = parseCommentAction("已经修改了 a.ts，但工具没有执行。");
+  const writes = [{ path: "a.ts", contents: "return 0;\n", applied: false }];
+  const plan = planFileEdits(action, "已经修改了 a.ts，但工具没有执行。", writes);
+  assert.equal(plan.selection, false);
+  assert.equal(plan.edited, true);
+  applyAgentWrites(root, plan.writes);
+  assert.equal(readFileSync(file, "utf8"), "return 0;\n");
+  assert.throws(() => applyAgentWrites(root, [{ path: "../outside.ts", contents: "no\n", applied: false }]), /路径超出仓库/);
+  const reply = parseCommentAction("动作：答复\n说明：\n这行只是返回合计。");
+  const ignored = planFileEdits(reply, "动作：答复\n说明：\n这行只是返回合计。", writes);
+  assert.equal(ignored.edited, false);
 });
 
 test("修改只替换核对过的当前文件行", () => {
