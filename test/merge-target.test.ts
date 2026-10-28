@@ -15,6 +15,10 @@ test("核对通过和需求准入都预填已绑定的合并目标", () => {
   assert.match(source, /\/branches\/track/);
   assert.match(source, /未认领/);
   assert.match(source, /只并进所选目标/);
+  assert.doesNotMatch(source, /window\.prompt/);
+  assert.match(source, /确认退回/);
+  assert.match(source, /ask-session/);
+  assert.match(source, /\/\^dev\\\/\[A-Za-z0-9\]\{8,\}/);
 });
 
 test("需求准入前没有合并目标就不能放行", async () => {

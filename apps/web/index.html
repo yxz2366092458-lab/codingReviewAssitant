@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>代码评审</title>
-    <link rel="stylesheet" href="/app.css?panel=18" />
+    <link rel="stylesheet" href="/app.css?panel=19" />
   </head>
   <body>
     <header class="top">
@@ -50,6 +50,15 @@
         <div id="decisions" class="row"></div>
       </div>
       <p id="banner" class="banner" hidden></p>
+      <form id="ask-form" class="ask-form" hidden>
+        <p id="ask-hint" class="muted"></p>
+        <div class="ask-fields">
+          <select id="ask-session"></select>
+          <input id="ask-text" type="text" spellcheck="false" autocomplete="off" />
+          <button type="submit" id="ask-confirm">确定</button>
+          <button type="button" id="ask-cancel">取消</button>
+        </div>
+      </form>
     </section>
     <div class="workspace">
       <aside id="files"></aside>
@@ -84,6 +93,6 @@
     </section>
     <p id="error" class="error" hidden></p>
     <script>/*__BOOT__*/</script>
-    <script type="module" src="/app.js?panel=19"></script>
+    <script type="module" src="/app.js?panel=20"></script>
   </body>
 </html>

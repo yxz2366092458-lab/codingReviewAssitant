@@ -78,6 +78,18 @@ button.decision { min-width: 96px; }
 .unclaimed-note { margin: 4px 0 0; color: var(--muted); max-width: 520px; }
 .unclaimed-row { display: flex; gap: 8px; align-items: center; flex-basis: 100%; }
 .unclaimed-row p { margin: 0; color: var(--muted); }
+.ask-form { margin-top: 12px; }
+.ask-fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ask-form select,
+.ask-form input {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.ask-form select { max-width: 280px; }
+.ask-form input { min-width: 220px; }
 .work-branches strong {
   font-weight: 650;
   background: var(--fill);

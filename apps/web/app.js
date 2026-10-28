@@ -32,6 +32,7 @@ const state = {
   remoteOnly: [],
   branchesLoaded: false,
   unclaimed: [],
+  ask: null,
   appliedEdit: null,
 };
 
@@ -82,6 +83,18 @@ async function bootRepo() {
   $("pick-repo").addEventListener("click", () => void pickRepo().catch(showError));
   $("register-repo").addEventListener("click", () => void registerRepo().catch(showError));
   $("bugfix-entry").addEventListener("submit", (event) => void submitBugfix(event).catch(showError));
+  $("ask-form").addEventListener("submit", (event) => void submitAsk(event).catch(showError));
+  $("ask-cancel").addEventListener("click", () => closeAsk());
+  $("ask-session").addEventListener("change", () => {
+    if (!state.ask || state.ask.kind !== "claim") return;
+    state.ask.sessionId = $("ask-session").value;
+    $("ask-text").value = state.ask.sessionId;
+  });
+  $("ask-text").addEventListener("input", () => {
+    if (!state.ask) return;
+    if (state.ask.kind === "claim") state.ask.sessionId = $("ask-text").value;
+    else state.ask.reason = $("ask-text").value;
+  });
   $("repo-path").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -130,30 +143,103 @@ function renderWorkBranches(status) {
 }
 
 async function claimBranch(branch) {
-  const automatic = /^dev\/[A-Za-z0-9]{8,}$/.test(branch);
-  let sessionId = "";
-  if (!automatic) {
-    const known = state.sessions.map((item) => `${item.development}（${item.sessionId}）`).join("，");
-    const hint = branch.startsWith("cursor/")
-      ? "可以认领到一条会话，或在核对通过时只并进所选目标。"
-      : "请填写要绑定的会话编号。";
-    const typed = window.prompt(`${hint}${known ? `\n已有会话：${known}` : ""}\n会话编号`, "");
-    if (typed === null) return;
-    sessionId = typed.trim();
+  if (/^dev\/[A-Za-z0-9]{8,}$/.test(branch)) {
+    await api(`/repos/${state.repoId}/work-branches/claim`, {
+      method: "POST",
+      body: JSON.stringify({ branch }),
+    });
+    closeAsk();
+    showNotice(`已认领 ${branch}`);
+    state.signature = "";
+    await refresh();
+    return;
+  }
+  state.ask = {
+    kind: "claim",
+    branch,
+    sliceId: "",
+    sessionId: state.sessions[0]?.sessionId ?? "",
+    reason: "",
+  };
+  state.signature = "";
+  renderAskForm(true);
+}
+
+function closeAsk() {
+  state.ask = null;
+  renderAskForm(false);
+}
+
+function renderAskForm(focus) {
+  const form = $("ask-form");
+  const ask = state.ask;
+  if (!ask) {
+    form.hidden = true;
+    return;
+  }
+  const typing = form.contains(document.activeElement);
+  form.hidden = false;
+  $("ask-hint").textContent = ask.kind === "claim"
+    ? ask.branch.startsWith("cursor/")
+      ? `把「${ask.branch}」认领到一条会话。也可以不认领，核对通过时只并进所选目标。`
+      : `把「${ask.branch}」认领到一条会话。`
+    : "写下退回原因。留空也会退回。";
+  const select = $("ask-session");
+  select.hidden = ask.kind !== "claim";
+  const input = $("ask-text");
+  input.placeholder = ask.kind === "claim" ? "会话编号" : "退回原因";
+  $("ask-confirm").textContent = ask.kind === "claim" ? "认领" : "确认退回";
+  if (typing && !focus) return;
+  if (ask.kind === "claim") {
+    select.replaceChildren();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = state.sessions.length ? "选择已有会话" : "还没有会话，请输入编号";
+    select.append(empty);
+    for (const item of state.sessions) {
+      const option = document.createElement("option");
+      option.value = item.sessionId;
+      option.textContent = `${item.development} · ${item.sessionId}`;
+      select.append(option);
+    }
+    select.value = state.sessions.some((item) => item.sessionId === ask.sessionId) ? ask.sessionId : "";
+    input.value = ask.sessionId;
+  } else {
+    input.value = ask.reason;
+  }
+  if (focus) input.focus();
+}
+
+async function submitAsk(event) {
+  event.preventDefault();
+  const ask = state.ask;
+  if (!ask) return;
+  if (ask.kind === "claim") {
+    const sessionId = $("ask-text").value.trim();
     if (!sessionId) {
       showNotice(
-        branch.startsWith("cursor/")
-          ? `分支「${branch}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`
+        ask.branch.startsWith("cursor/")
+          ? `分支「${ask.branch}」还没有认领到需求会话。可以认领到一条会话，或在核对通过时只并进所选目标。`
           : "请选择或建立会话后再认领这个分支。",
       );
       return;
     }
+    await api(`/repos/${state.repoId}/work-branches/claim`, {
+      method: "POST",
+      body: JSON.stringify({ branch: ask.branch, sessionId }),
+    });
+    closeAsk();
+    showNotice(`已认领 ${ask.branch}`);
+    state.signature = "";
+    await refresh();
+    return;
   }
-  await api(`/repos/${state.repoId}/work-branches/claim`, {
+  await api(`/repos/${state.repoId}/gate/reject`, {
     method: "POST",
-    body: JSON.stringify(sessionId ? { branch, sessionId } : { branch }),
+    body: JSON.stringify({ sliceId: ask.sliceId, reason: $("ask-text").value.trim() }),
   });
-  showNotice(`已认领 ${branch}`);
+  closeAsk();
+  state.sliceId = "";
   state.signature = "";
   await refresh();
 }
@@ -237,6 +323,7 @@ function resetView() {
   state.remoteOnly = [];
   state.branchesLoaded = false;
   state.unclaimed = [];
+  state.ask = null;
   state.appliedEdit = null;
   $("source").hidden = true;
   $("diff").replaceChildren();
@@ -334,6 +421,7 @@ async function loadPanel() {
     development: status.development,
     branch: status.branch,
     unclaimed: (status.unclaimed ?? []).map((item) => `${item.kind}:${item.branch}`).join(","),
+    ask: state.ask ? `${state.ask.kind}:${state.ask.branch}:${state.ask.sliceId}` : "",
     mergeTarget: status.mergeTarget ?? gate.mergeTarget ?? "",
     historyPage: slices.page,
     history: (slices.items ?? []).map((slice) => `${slice.sliceId}:${slice.state}`).join(","),
@@ -366,6 +454,7 @@ async function loadPanel() {
   state.files = diff.files ?? [];
   renderSummary(gate);
   renderBugfix(gate);
+  renderAskForm(false);
   renderFiles(diff.files ?? []);
   renderHistory(slices);
   if (!state.fileId && diff.files?.[0]) state.fileId = diff.files[0].fileId;
@@ -466,11 +555,15 @@ function decision(label, onClick) {
 }
 
 async function act(name, sliceId) {
-  const reason = name === "reject" ? window.prompt("退回原因", "") ?? "" : "";
-  if (name === "reject" && reason === null) return;
+  if (name === "reject") {
+    state.ask = { kind: "reject", branch: "", sliceId, sessionId: "", reason: "" };
+    state.signature = "";
+    renderAskForm(true);
+    return;
+  }
   await api(`/repos/${state.repoId}/gate/${name}`, {
     method: "POST",
-    body: JSON.stringify({ sliceId, reason }),
+    body: JSON.stringify({ sliceId, reason: "" }),
   });
   state.sliceId = "";
   await refresh();
