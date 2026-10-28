@@ -1,0 +1,26 @@
+test/explain.test.ts
+  s_fd528823e8d35d::t_2c220662f43cd0 311-344
+apps/daemon/src/explain.ts
+  s_fd528823e8d35d::t_46c04c8717fc98 725
+  s_fd528823e8d35d::t_ff71b97a2dc16c 606,608-652
+test/cursor-proxy.test.ts
+  s_fd528823e8d35d::t_039ed89268c67f 43-50
+apps/daemon/src/cursor-proxy.ts
+  s_fd528823e8d35d::t_f459dcb73ee826 216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3aa045470388d698004b8b65c38f280fd159b644",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
