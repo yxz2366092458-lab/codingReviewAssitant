@@ -1,0 +1,27 @@
+docs/architecture.md
+  s_fd528823e8d35d::t_63708d6d6b3628 22
+  s_fd528823e8d35d::t_7607f34694ecf7 100
+  s_fd528823e8d35d::t_bcc1e7f3dffbbd 365-367
+  s_fd528823e8d35d::t_8eb644f78ddf2d 378
+  s_fd528823e8d35d::t_91b12911484741 19-21
+  s_fd528823e8d35d::t_9ebe110a8d57bd 23-25,97-99
+  s_fd528823e8d35d::t_845e372f19573b 101-103,362-364
+  s_fd528823e8d35d::t_a413f103ee3ad8 368-370,375-377
+  s_fd528823e8d35d::t_c53ec50ecc0853 379-381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4bcf6c6de6b41d037f25f1d4254aa8ee053bc5d4",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
