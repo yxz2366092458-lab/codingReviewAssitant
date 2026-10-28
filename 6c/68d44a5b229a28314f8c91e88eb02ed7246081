@@ -1,0 +1,42 @@
+apps/daemon/src/explain.ts
+  s_fd528823e8d35d::t_c9795b607ee906 28-32
+  s_fd528823e8d35d::t_93350941f0d621 645,650-669,675-677
+  s_fd528823e8d35d::t_16e836bd29865a 691
+  s_fd528823e8d35d::t_f9ca0a2b6f008c 718
+test/explain.test.ts
+  s_fd528823e8d35d::t_a8438445f0c7e2 241,243,245-247
+  s_fd528823e8d35d::t_2cd537b6e35e74 275-345
+apps/daemon/src/server.ts
+  s_fd528823e8d35d::t_b7c4caf449fcee 538-546
+  s_fd528823e8d35d::t_b765b23b843d6a 172-191
+  s_fd528823e8d35d::t_0ec224d7030f31 42
+apps/web/app.js
+  s_fd528823e8d35d::t_63896f4c985425 23
+  s_fd528823e8d35d::t_923cee3ff10eb5 1229-1230
+  s_fd528823e8d35d::t_1b51ac373f7f15 176
+  s_fd528823e8d35d::t_3ee5a53697a6aa 1134
+  s_fd528823e8d35d::t_c8090dd09eb128 1244,1248
+  s_fd528823e8d35d::t_07d571d0b73f35 197-204
+  s_fd528823e8d35d::t_97fa3f440c26e0 1175
+  s_fd528823e8d35d::t_a2851fcfdf6c87 1348-1349
+  s_fd528823e8d35d::t_087ff5180670f4 1296,1303,1308-1332
+  s_fd528823e8d35d::t_8f0c69436f43f7 1378,1380-1381
+  s_fd528823e8d35d::t_522fd2e1ff6153 1364
+  s_fd528823e8d35d::t_c01c7ff6c448f7 1333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6c68d44a5b229a28314f8c91e88eb02ed7246081",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
