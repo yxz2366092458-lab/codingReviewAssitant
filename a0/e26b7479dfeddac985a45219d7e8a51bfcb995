@@ -1,0 +1,21 @@
+apps/mac/Panel.swift
+  s_fd528823e8d35d::t_f8d745325b397e 12,24,27,34,44-78,83
+docs/architecture.md
+  s_fd528823e8d35d::t_d639a965ca6f94 138-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a0e26b7479dfeddac985a45219d7e8a51bfcb995",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
