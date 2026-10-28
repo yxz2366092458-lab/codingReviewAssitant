@@ -195,9 +195,13 @@ function fromEvents(events: unknown[]): { text: string; writes: AgentWrite[] } {
     }
     if (record.type !== "tool_call") continue;
     const extracted = extractWrite(record.tool_call);
-    if (!extracted?.path) continue;
     const callId = typeof record.call_id === "string" ? record.call_id : `anon-${order.length}`;
     const applied = record.subtype === "completed" && toolSuccess(record.tool_call);
+    if (!extracted?.path) {
+      const prev = byCall.get(callId);
+      if (prev && applied) byCall.set(callId, { ...prev, applied: true });
+      continue;
+    }
     const prev = byCall.get(callId);
     const next: AgentWrite = {
       path: extracted.path || prev?.path || "",
@@ -232,6 +236,8 @@ function collectMessageText(value: unknown, parts: string[]): void {
 function extractWrite(call: unknown): { path: string; contents?: string; oldText?: string; newText?: string } | null {
   if (!call || typeof call !== "object") return null;
   const record = call as Record<string, unknown>;
+  const nested = oneofWrite(record);
+  if (nested) return nested;
   const fn = record.function;
   if (fn && typeof fn === "object") {
     const name = (fn as { name?: unknown }).name;
@@ -246,6 +252,18 @@ function extractWrite(call: unknown): { path: string; contents?: string; oldText
     if (found) return found;
   }
   return null;
+}
+
+function oneofWrite(record: Record<string, unknown>): { path: string; contents?: string; oldText?: string; newText?: string } | null {
+  const tool = record.tool;
+  if (!tool || typeof tool !== "object") return null;
+  const body = tool as { case?: unknown; value?: unknown };
+  const name = typeof body.case === "string" ? body.case : "";
+  if (!/write|edit|replace|patch/i.test(name)) return null;
+  const value = body.value && typeof body.value === "object" ? body.value as Record<string, unknown> : null;
+  if (!value) return null;
+  const args = value.args && typeof value.args === "object" ? value.args as Record<string, unknown> : value;
+  return fieldsFrom(args);
 }
 
 function parseArgs(value: unknown): Record<string, unknown> | null {
@@ -264,7 +282,7 @@ function parseArgs(value: unknown): Record<string, unknown> | null {
 function fieldsFrom(args: Record<string, unknown>): { path: string; contents?: string; oldText?: string; newText?: string } | null {
   const path = firstString(args, ["path", "file_path", "filePath", "target_file", "targetFile"]);
   if (!path) return null;
-  const contents = firstString(args, ["fileText", "contents", "content", "file_text"]);
+  const contents = firstString(args, ["fileText", "contents", "content", "file_text", "streamContent"]);
   const oldText = firstString(args, ["old_string", "oldString", "old_text", "oldText"]);
   const newText = firstString(args, ["new_string", "newString", "new_text", "newText"]);
   if (contents === undefined && (oldText === undefined || newText === undefined)) return null;
@@ -286,6 +304,7 @@ function toolSuccess(call: unknown): boolean {
     const current = stack.pop();
     if (!current || typeof current !== "object" || seen.has(current)) continue;
     seen.add(current);
+    if ("case" in current && (current as { case?: unknown }).case === "success") return true;
     if ("success" in current && (current as { success?: unknown }).success) return true;
     for (const value of Object.values(current)) {
       if (value && typeof value === "object") stack.push(value);

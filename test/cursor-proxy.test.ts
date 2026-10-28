@@ -40,6 +40,43 @@ test("要求修改时允许写入，并从流里取出未执行的写文件内�
   assert.equal(applied.writes[0]?.applied, true);
 });
 
+test("Cursor 实际的 case/value 工具结果也能取出未落盘的修改", () => {
+  const denied = readAgentRun([
+    JSON.stringify({ type: "assistant", message: { content: [{ text: "好的。" }] } }),
+    JSON.stringify({
+      type: "tool_call",
+      subtype: "completed",
+      call_id: "1",
+      tool_call: {
+        tool: {
+          case: "editToolCall",
+          value: {
+            args: { path: "a.ts", oldString: "return total;", newString: "return 0;" },
+            result: { case: "error", value: { error: "门禁未放行" } },
+          },
+        },
+      },
+    }),
+    JSON.stringify({ type: "result", result: "好的。" }),
+  ].join("\n"));
+  assert.equal(denied.writes[0]?.applied, false);
+  assert.equal(denied.writes[0]?.oldText, "return total;");
+  assert.equal(denied.writes[0]?.newText, "return 0;");
+  const applied = readAgentRun(JSON.stringify({
+    type: "tool_call",
+    subtype: "completed",
+    call_id: "2",
+    tool_call: {
+      tool: {
+        case: "writeToolCall",
+        value: { args: { path: "a.ts", fileText: "return 1;\n" }, result: { case: "success", value: {} } },
+      },
+    },
+  }));
+  assert.equal(applied.writes[0]?.applied, true);
+  assert.equal(applied.writes[0]?.contents, "return 1;\n");
+});
+
 test("调用 Cursor agent 时信任工作区，只提问，不让它改文件", () => {
   const args = agentArgs("/repo", "说明这段代码");
   assert.equal(args.includes("--mode"), true);

@@ -1321,10 +1321,13 @@ async function sendComment(group, text) {
     delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
     if (result.edited) {
-      state.appliedEdit = result.edit?.path ? result.edit : { path: group.path, start: group.start, end: group.end, code: "" };
-      showNotice(state.appliedEdit.path ? `已写入 ${state.appliedEdit.path}` : "已写入工作区");
+      const written = result.edit?.path || group.path;
+      state.appliedEdit = { path: written, start: 0, end: 0, code: "" };
+      const notice = written ? `已写入 ${written}` : "已写入工作区";
+      showNotice(notice);
       state.signature = "";
       await refresh();
+      showNotice(notice);
     } else {
       placeExplainBars();
     }

@@ -601,7 +601,9 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       }
       if (scope === "staged") return await listStaged(cwd);
       if (scope === "unstaged") return await listUnstaged(cwd);
-      const commit = commitFor(repoId, sliceId, await headBranch(cwd));
+      const head = await headBranch(cwd);
+      const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+      const commit = row?.commit_sha ?? null;
       if (commit) {
         const parent = await parentOf(cwd, commit);
         return parent ? await listCommit(cwd, parent, commit) : [];
@@ -619,7 +621,7 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       const slice = review.view.slice;
       if (slice?.commitSha) {
         const parent = await parentOf(cwd, slice.commitSha);
-        if (parent) return [parent, slice.commitSha];
+        if (parent) return commitDiffArgs(parent, slice.commitSha, review.pair.development, await headBranch(cwd));
       }
       if (review.view.state === "editing" && review.pair.development === await headBranch(cwd)) return ["HEAD"];
       return [`${review.pair.requirement}...${review.pair.development}`];
@@ -631,10 +633,12 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
     }
     if (scope === "staged") return ["--cached"];
     if (scope === "unstaged") return [];
-    const commit = commitFor(repoId, sliceId, await headBranch(cwd));
+    const head = await headBranch(cwd);
+    const row = sliceId ? findSlice(db, sliceId) : activeSlice(db, repoId, head);
+    const commit = row?.commit_sha ?? null;
     if (commit) {
       const parent = await parentOf(cwd, commit);
-      if (parent) return [parent, commit];
+      if (parent) return commitDiffArgs(parent, commit, row?.branch ?? "", head);
     }
     return ["HEAD"];
   }
@@ -647,11 +651,6 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
     } catch {
       return summarizeFile(file, "");
     }
-  }
-
-  function commitFor(repoId: string, sliceId: string | null, branch: string): string | null {
-    if (sliceId) return findSlice(db, sliceId)?.commit_sha ?? null;
-    return gateView(db, repoId, branch).slice?.commitSha ?? null;
   }
 
   async function waitFor(req: IncomingMessage, res: ServerResponse, repoId: string, sliceId: string | null): Promise<void> {
@@ -719,6 +718,11 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
         });
       }),
   };
+}
+
+export function commitDiffArgs(parent: string, commit: string, sliceBranch: string, head: string): string[] {
+  if (sliceBranch && sliceBranch === head) return [parent];
+  return [parent, commit];
 }
 
 async function topLevel(repoPath: string): Promise<string> {
