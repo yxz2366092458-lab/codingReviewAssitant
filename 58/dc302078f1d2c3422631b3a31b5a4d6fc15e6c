@@ -1,0 +1,60 @@
+apps/web/app.css
+  s_fd528823e8d35d::t_f7e52be26246fa 78-80
+apps/daemon/src/server.ts
+  s_fd528823e8d35d::t_207b7b0c6560e1 405-417
+  s_fd528823e8d35d::t_7cfe1844c9afcc 346-364
+  s_fd528823e8d35d::t_328d5c4119cec6 488-490
+  s_fd528823e8d35d::t_f4d645cc5d69a4 38
+  s_fd528823e8d35d::t_f6c039d09a6395 43
+  s_fd528823e8d35d::t_a3172113c6589e 282,289-308
+  s_fd528823e8d35d::t_1ad2be7b90bd26 439-440
+apps/web/app.js
+  s_fd528823e8d35d::t_e31615dba4eda2 32-34
+  s_fd528823e8d35d::t_1ac00a84d20f3f 237-239
+  s_fd528823e8d35d::t_8ba1cbf5ef882f 321
+  s_fd528823e8d35d::t_9e5124205066ef 108-158
+  s_fd528823e8d35d::t_e1713a23903b5a 562-575,1543
+  s_fd528823e8d35d::t_5fb7a26740b6f1 535-545,547-548
+  s_fd528823e8d35d::t_751483f863f4ea 1508,1524-1542
+  s_fd528823e8d35d::t_4b22b61f510ded 335-336
+  s_fd528823e8d35d::t_ebccd7b75a2233 521
+test/work-branch.test.ts
+  s_fd528823e8d35d::t_e76878f2251817 351-464
+  s_fd528823e8d35d::t_61a5aab8978f93 9
+test/merge-target.test.ts
+  s_fd528823e8d35d::t_774c16bccd0a07 144-156,158-268
+  s_fd528823e8d35d::t_23ef8124262dee 157
+  s_fd528823e8d35d::t_0c131cef1f5e6a 14
+  s_fd528823e8d35d::t_757c32c2736b74 15-17
+apps/daemon/src/work-branch.ts
+  s_fd528823e8d35d::t_c620a121fc8dca 5
+  s_fd528823e8d35d::t_3f976d9e87d37e 435
+  s_fd528823e8d35d::t_cf874c2ace11e9 287,385-434,436-476
+  s_fd528823e8d35d::t_3bca2dd0612590 118
+  s_fd528823e8d35d::t_92e34a92bbdb3b 224,229-286
+  s_fd528823e8d35d::t_6b97b2e3270e90 17-35
+  s_fd528823e8d35d::t_36b5a1e25d3bb3 288
+apps/daemon/src/branches.ts
+  s_fd528823e8d35d::t_026c4ff24a696a 16-17,20,25
+  s_fd528823e8d35d::t_0d29cb3d43a7b0 43-109
+apps/web/index.html
+  s_fd528823e8d35d::t_885165ab351343 7
+  s_fd528823e8d35d::t_7dc6c44123078f 25,29
+  s_fd528823e8d35d::t_1a77aebdb85c6c 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "58dc302078f1d2c3422631b3a31b5a4d6fc15e6c",
+  "prompts": {},
+  "sessions": {
+    "s_fd528823e8d35d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "",
+        "model": "unknown"
+      },
+      "human_author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
