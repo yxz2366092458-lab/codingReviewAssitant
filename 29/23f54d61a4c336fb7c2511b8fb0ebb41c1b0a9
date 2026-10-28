@@ -1,0 +1,14 @@
+docs/architecture.md
+  h_2a16997f34cffe 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2923f54d61a4c336fb7c2511b8fb0ebb41c1b0a9",
+  "prompts": {},
+  "humans": {
+    "h_2a16997f34cffe": {
+      "author": "yuxiaozhen.1 <yuxiaozhen.1@jd.com>"
+    }
+  }
+}
