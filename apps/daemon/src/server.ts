@@ -35,7 +35,7 @@ import {
   toSlice,
   writeDaemonInfo,
 } from "./session/store.ts";
-import { checkoutBranch, createBranch, listLocalBranches, startRef } from "./branches.ts";
+import { checkoutBranch, createBranch, listLocalBranches, mergeBranch, startRef } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
@@ -428,8 +428,19 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
           console.error(`核对通过未合并：${message}`);
           throw new GateError(409, message);
         }
-        mergeNote = branch ? `${error.message}选择的「${branch}」没有写入。` : error.message;
-        console.error(`核对通过未合并：${mergeNote}`);
+        if (branch && branch !== branchName) {
+          try {
+            await mergeBranch(repo.path, branch, branchName);
+          } catch (mergeError) {
+            const message = mergeError instanceof Error ? mergeError.message : "合并失败";
+            console.error(`核对通过未合并：${message}`);
+            throw new GateError(409, message);
+          }
+          mergeNote = `分支「${branchName}」没有对应的需求会话，已将该分支合并到「${branch}」，没有动其他会话。`;
+        } else {
+          mergeNote = branch ? `${error.message}选择的「${branch}」没有写入。` : error.message;
+        }
+        console.error(`核对通过：${mergeNote}`);
       }
       const view = acknowledge(db, String(body.sliceId ?? ""));
       publish(repo.id, status.branch);

@@ -119,14 +119,15 @@ test("切片分支没有需求会话时，核对通过不会合并其他会话",
       branch: "release",
     });
     assert.equal(acked.state, "locked");
-    assert.match(acked.mergeNote, /feature-api/);
-    assert.match(acked.mergeNote, /没有合并/);
-    assert.match(acked.mergeNote, /release/);
+    assert.match(acked.mergeNote, /已将该分支合并到「release」/);
+    assert.match(acked.mergeNote, /没有动其他会话/);
+    assert.doesNotMatch(acked.mergeNote, /没有写入/);
     assert.equal(sha("req/old"), before.oldReq);
     assert.equal(sha("dev/old"), before.oldDev);
-    assert.equal(sha("release"), before.release);
+    assert.equal(sha("release"), sha("feature-api"));
     assert.equal(git(["branch", "--show-current"]).trim(), "feature-api");
-    assert.doesNotMatch(git(["ls-tree", "-r", "--name-only", "release"]), /api\.txt/);
+    assert.match(git(["ls-tree", "-r", "--name-only", "release"]), /api\.txt/);
+    assert.doesNotMatch(git(["ls-tree", "-r", "--name-only", "release"]), /old\.txt/);
     assert.doesNotMatch(git(["ls-tree", "-r", "--name-only", "req/old"]), /old\.txt/);
   } finally {
     await server.close();
