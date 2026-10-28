@@ -39,7 +39,7 @@ import { checkoutBranch, createBranch, listLocalBranches, startRef } from "./bra
 import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
-import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession } from "./explain.ts";
+import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession, type ExplainProgress } from "./explain.ts";
 import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
@@ -166,6 +166,26 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       publish(repo.id, status.branch);
     } catch {
       return;
+    }
+  }
+
+  function publishExplain(repoId: string, anchor: { path: string; side: string; start: number; end: number }, event: ExplainProgress): void {
+    const payload = JSON.stringify({
+      type: "explain.progress",
+      repoId,
+      path: anchor.path,
+      side: anchor.side,
+      start: anchor.start,
+      end: anchor.end,
+      phase: event.phase,
+      text: event.text,
+    });
+    for (const client of clients) {
+      try {
+        client.send(payload);
+      } catch {
+        clients.delete(client);
+      }
     }
   }
 
@@ -515,7 +535,15 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       }
       const comment = String(body.comment ?? "").trim();
       if (!comment) throw new GateError(400, "先写下评论");
-      const result = await explainInSession(db, repo.id, session, lines, comment, anchor, repo.path);
+      const marker = anchor ?? {
+        path: lines[0]?.path ?? "",
+        side: lines[0]?.side ?? "head",
+        start: lines[0]?.line ?? 1,
+        end: lines[lines.length - 1]?.line ?? lines[0]?.line ?? 1,
+      };
+      const result = await explainInSession(db, repo.id, session, lines, comment, anchor, repo.path, (event) => {
+        publishExplain(repo.id, marker, event);
+      });
       sendJson(res, 200, { sessionId: session, ...result });
       return;
     }

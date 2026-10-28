@@ -20,6 +20,7 @@ const state = {
   explainOpen: {},
   explainFolded: {},
   pendingExplain: {},
+  explainProgress: {},
   drafts: {},
   viewSession: "",
   viewBranch: "",
@@ -172,6 +173,7 @@ function resetView() {
   state.explainOpen = {};
   state.explainFolded = {};
   state.pendingExplain = {};
+  state.explainProgress = {};
   state.drafts = {};
   state.viewSession = "";
   state.viewBranch = "";
@@ -192,7 +194,14 @@ function connect() {
     events.close();
   }
   events = new WebSocket(`ws://127.0.0.1:${location.port}/repos/${state.repoId}/events?token=${boot.token}`);
-  events.addEventListener("message", () => void refresh().catch(showError));
+  events.addEventListener("message", (event) => {
+    const payload = readEvent(event.data);
+    if (payload?.type === "explain.progress") {
+      showExplainProgress(payload);
+      return;
+    }
+    void refresh().catch(showError);
+  });
 }
 
 function diffQuery() {
@@ -1122,7 +1131,7 @@ function explainDock(group) {
     body.append(item);
   }
   const pending = state.pendingExplain[key];
-  if (pending === "comment") body.append(explainPending());
+  if (pending === "comment") body.append(explainPending(key));
   const text = document.createElement("textarea");
   text.rows = 2;
   text.placeholder = "写下对这段代码的评论。";
@@ -1163,7 +1172,7 @@ function explainBubble(group, mode) {
     switcher.append(button);
   }
   bubble.append(switcher);
-  if (state.pendingExplain[key] === mode) bubble.append(explainPending());
+  if (state.pendingExplain[key] === mode) bubble.append(explainPending(key));
   const content = group.modes?.[mode] || threadModes(key)?.[mode] || "";
   if (content) {
     const body = document.createElement("p");
@@ -1217,6 +1226,8 @@ async function requestExplain(group, mode) {
   }
   const key = anchorKey(group);
   state.pendingExplain[key] = mode;
+  state.explainProgress[key] = "正在回答";
+  showNotice("正在回答");
   placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
@@ -1230,9 +1241,11 @@ async function requestExplain(group, mode) {
     });
     rememberThread(result, group);
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
   } catch (error) {
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
     throw error;
   }
@@ -1280,16 +1293,42 @@ function paintAppliedEdit() {
   }
 }
 
-function explainPending() {
+function explainPending(key) {
   const row = document.createElement("p");
   row.className = "explain-pending";
   const icon = document.createElement("span");
   icon.className = "spinner";
   icon.setAttribute("aria-hidden", "true");
   const label = document.createElement("span");
-  label.textContent = "AI处理中";
+  label.textContent = state.explainProgress[key] || "正在回答";
   row.append(icon, label);
   return row;
+}
+
+function readEvent(data) {
+  if (typeof data !== "string") return null;
+  try {
+    const payload = JSON.parse(data);
+    return payload && typeof payload === "object" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+function showExplainProgress(payload) {
+  if (payload.repoId && state.repoId && payload.repoId !== state.repoId) return;
+  const key = anchorKey({
+    path: payload.path,
+    side: payload.side,
+    start: Number(payload.start),
+    end: Number(payload.end),
+  });
+  const text = String(payload.text || "");
+  if (!text) return;
+  if (!state.pendingExplain[key] && payload.phase !== "fail") return;
+  state.explainProgress[key] = text;
+  if (state.pendingExplain[key] || payload.phase === "fail") showNotice(text);
+  placeExplainBars();
 }
 
 async function sendComment(group, text) {
@@ -1306,6 +1345,8 @@ async function sendComment(group, text) {
   }
   state.drafts[key] = comment;
   state.pendingExplain[key] = "comment";
+  state.explainProgress[key] = "正在理解评论";
+  showNotice("正在理解评论");
   placeExplainBars();
   try {
     const result = await api(`/repos/${state.repoId}/explain`, {
@@ -1320,6 +1361,7 @@ async function sendComment(group, text) {
     rememberThread(result, group);
     delete state.drafts[anchorKey(result.anchor ?? group)];
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     if (result.edited) {
       const written = result.edit?.path || group.path;
       state.appliedEdit = { path: written, start: 0, end: 0, code: "" };
@@ -1333,8 +1375,10 @@ async function sendComment(group, text) {
     }
   } catch (error) {
     delete state.pendingExplain[key];
+    delete state.explainProgress[key];
     placeExplainBars();
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    showNotice(message.startsWith("失败：") ? message : `失败：${message}`);
   }
 }
 

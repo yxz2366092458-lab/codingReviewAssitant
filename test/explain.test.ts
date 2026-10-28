@@ -238,9 +238,13 @@ test("评论要求改选中配置时，模型只说改好或调用失败也会�
     },
   });
   useCursorProxy({ url: proxy.url, token: proxy.token });
+  const steps: string[] = [];
   try {
-    const result = await explainInSession(db, "repo", "session", notifyLines, notifyComment, undefined, root);
+    const result = await explainInSession(db, "repo", "session", notifyLines, notifyComment, undefined, root, (event) => steps.push(event.text));
     assert.equal(result.edited, true);
+    assert.deepEqual(steps.slice(0, 2), ["正在理解评论", "正在调用 agent"]);
+    assert.equal(steps.includes("正在写入文件"), true);
+    assert.ok(steps.indexOf("正在调用 agent") < steps.indexOf("正在写入文件"));
     const written = readFileSync(file, "utf8");
     assert.match(written, /confirm-pc-url=https:\/\/p\.jd\.com\/admin\/product-atlas\/structure/);
     assert.doesNotMatch(written, /notify\.app-key=/);
@@ -265,6 +269,77 @@ test("评论要求改选中配置时，模型只说改好或调用失败也会�
   } finally {
     useCursorProxy(null);
     await failing.close();
+  }
+});
+
+test("提问只答复，进度停在正在回答，不写文件", async () => {
+  const root = mkdtempSync(join(tmpdir(), "review-answer-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "return total;\n");
+  const db = new DatabaseSync(":memory:");
+  const proxy = await startCursorProxy({
+    repoPath: root,
+    run: async ({ args }) => {
+      assert.equal(args.includes("ask"), true);
+      assert.equal(args.includes("--force"), false);
+      return "动作：答复\n说明：\n这行返回合计。";
+    },
+  });
+  useCursorProxy({ url: proxy.url, token: proxy.token });
+  const steps: string[] = [];
+  try {
+    const result = await explainInSession(
+      db,
+      "repo",
+      "session",
+      [{ path: "a.ts", side: "head", line: 1, text: "return total;" }],
+      "这行做什么",
+      undefined,
+      root,
+      (event) => steps.push(event.text),
+    );
+    assert.equal(result.edited, false);
+    assert.equal(steps.includes("正在回答"), true);
+    assert.equal(steps.some((item) => item.includes("写入")), false);
+    assert.equal(readFileSync(file, "utf8"), "return total;\n");
+  } finally {
+    useCursorProxy(null);
+    await proxy.close();
+  }
+});
+
+test("改不动时进度以失败原因结束", async () => {
+  const root = mkdtempSync(join(tmpdir(), "review-fail-"));
+  const file = join(root, "a.ts");
+  writeFileSync(file, "return total;\n");
+  const db = new DatabaseSync(":memory:");
+  const proxy = await startCursorProxy({
+    repoPath: root,
+    run: async () => "这里先说明一下，暂时给不出替换代码。",
+  });
+  useCursorProxy({ url: proxy.url, token: proxy.token });
+  const steps: string[] = [];
+  try {
+    await assert.rejects(
+      () => explainInSession(
+        db,
+        "repo",
+        "session",
+        [{ path: "a.ts", side: "head", line: 1, text: "return total;" }],
+        "这里不要因为分支名阻塞用户",
+        undefined,
+        root,
+        (event) => steps.push(event.text),
+      ),
+      /没有写出可替换的代码/,
+    );
+    assert.equal(steps.includes("正在理解评论"), true);
+    assert.equal(steps.includes("正在调用 agent"), true);
+    assert.equal(steps.at(-1), "失败：没有写出可替换的代码");
+    assert.equal(readFileSync(file, "utf8"), "return total;\n");
+  } finally {
+    useCursorProxy(null);
+    await proxy.close();
   }
 });
 

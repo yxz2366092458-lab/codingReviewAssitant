@@ -25,6 +25,11 @@ export type ExplainAnchor = {
 
 export type ExplainStyle = "pseudo" | "line";
 
+export type ExplainProgress = {
+  phase: "understand" | "agent" | "revise" | "write" | "answer" | "fail";
+  text: string;
+};
+
 export type ExplainModes = {
   pseudo?: string;
   line?: string;
@@ -637,15 +642,39 @@ export async function explainInSession(
   comment: string,
   anchor?: ExplainAnchor,
   root = "",
+  onProgress?: (event: ExplainProgress) => void,
 ): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor; edited: boolean; edit: { path: string; start: number; end: number; code: string } | null }> {
   if (!lines.length) throw new Error("先选中代码行");
   const target = anchor ?? anchorFor(lines);
   if (!target) throw new Error("请选择同一侧连续的代码行");
+  const report = (phase: ExplainProgress["phase"], text: string) => onProgress?.({ phase, text });
+  try {
+    return await runComment(db, repoId, sessionId, lines, comment, target, root, report);
+  } catch (error) {
+    const message = error instanceof Error && error.message.trim() ? error.message.trim() : "解释失败";
+    report("fail", message.startsWith("失败：") ? message : `失败：${message}`);
+    throw error;
+  }
+}
+
+async function runComment(
+  db: DatabaseSync,
+  repoId: string,
+  sessionId: string,
+  lines: CodeLine[],
+  comment: string,
+  target: ExplainAnchor,
+  root: string,
+  report: (phase: ExplainProgress["phase"], text: string) => void,
+): Promise<{ reply: string; turns: ExplainTurn[]; anchor: ExplainAnchor; edited: boolean; edit: { path: string; start: number; end: number; code: string } | null }> {
   const history = loadThread(db, repoId, sessionId, target);
   const wantsEdit = commentRequestsEdit(comment);
   const near = wantsEdit ? neighborhood(root, lines) : "";
   let run: { text: string; writes: AgentWrite[] } = { text: "", writes: [] };
   let modelFailed = false;
+  if (wantsEdit) report("understand", "正在理解评论");
+  else report("answer", "正在回答");
+  report("agent", wantsEdit ? "正在调用 agent" : "正在回答");
   try {
     run = await completeRun(wantsEdit ? editPrompt(history, lines, comment, near) : sessionPrompt(history, lines, comment), wantsEdit, root);
   } catch (error) {
@@ -659,6 +688,7 @@ export async function explainInSession(
   let reply = run.text.trim();
   let action = resolveEdit(lines, comment, reply);
   if (wantsEdit && action.kind !== "edit" && !writable(run.writes) && !modelFailed) {
+    report("revise", "正在根据评论整理改动");
     try {
       const again = await completeRun(retryEditPrompt(lines, comment, near), true, root);
       const againReply = again.text.trim();
@@ -685,6 +715,7 @@ export async function explainInSession(
   const plan = planFileEdits(action, reply, run.writes, wantsEdit);
   if (wantsEdit && !plan.edited) throw new Error("没有写出可替换的代码");
   let edit: { path: string; start: number; end: number; code: string } | null = null;
+  if (plan.edited) report("write", "正在写入文件");
   if (plan.selection) {
     if (!root) throw new Error("不能修改代码");
     if (action.kind !== "edit") throw new Error("不能修改代码");
