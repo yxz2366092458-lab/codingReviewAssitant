@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
+import { commitTrackedEdits, mergeFastForward, startRef } from "../apps/daemon/src/branches.ts";
 import { admitSession, composerName, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, sessionBranchNames, sessionPhase, userAskFromTranscript, workBranchNames } from "../apps/daemon/src/work-branch.ts";
 
 function git(cwd: string, args: string[]) {
@@ -87,6 +87,26 @@ test("已有会话编号的需求分支改成会话总结", async () => {
   const branches = execFileSync("git", ["branch", "--format=%(refname:short)"], { cwd }).toString();
   assert.match(branches, /req\/Session-naming-issue/);
   assert.doesNotMatch(branches, /req\/fdea6284fcb149cb/);
+});
+
+test("核验前先提交评论改过的文件，再切分支", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "review-commit-edits-"));
+  git(cwd, ["init", "-b", "main"]);
+  git(cwd, ["config", "user.email", "review@local"]);
+  git(cwd, ["config", "user.name", "review"]);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  git(cwd, ["add", "a.txt"]);
+  git(cwd, ["commit", "-m", "base"]);
+  git(cwd, ["branch", "req/demo"]);
+  git(cwd, ["switch", "-c", "dev/demo"]);
+  writeFileSync(join(cwd, "a.txt"), "changed\n");
+  writeFileSync(join(cwd, "note.txt"), "untracked\n");
+  assert.equal(await commitTrackedEdits(cwd, "采纳评审评论中的修改。"), true);
+  assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd }).toString(), "?? note.txt\n");
+  assert.match(execFileSync("git", ["log", "-1", "--format=%s"], { cwd }).toString(), /采纳评审评论中的修改/);
+  assert.equal(execFileSync("git", ["show", "HEAD:a.txt"], { cwd }).toString(), "changed\n");
+  await mergeFastForward(cwd, "req/demo", "dev/demo");
+  assert.equal(execFileSync("git", ["show", "req/demo:a.txt"], { cwd }).toString(), "changed\n");
 });
 
 test("需求名分成需求分支和开发分支", () => {
