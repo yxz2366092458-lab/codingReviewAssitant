@@ -40,7 +40,7 @@ import { chooseFolder } from "./pick-folder.ts";
 import { startCursorProxy, useCursorProxy } from "./cursor-proxy.ts";
 import { cursorRecentStatePath, readRecentFolderPaths } from "./cursor-workspaces.ts";
 import { explainInSession, explainSelection, loadThreads, normalizeLines, readAnchor, resolveExplainSession, type ExplainProgress } from "./explain.ts";
-import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase } from "./work-branch.ts";
+import { admitSession, bindMergeTarget, currentSessionId, listWorkSessions, mergeRequirementIntoBranch, mergeWorkBranches, openWorkBranches, readMergeTarget, readSessionBranches, readSessionSummary, readWorkBranches, repairSessionRequirements, sessionPhase, UnmatchedWorkBranchError } from "./work-branch.ts";
 import { readFinalRound, setFinalRound } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { openPanel } from "./panel.ts";
@@ -417,19 +417,23 @@ export async function startServer(options: { repoPath: string; open?: boolean; d
       const status = await repoStatus(repo.path, repo.base_ref);
       const slice = findSlice(db, String(body.sliceId ?? ""));
       const branchName = slice?.branch || status.branch;
-      await mergeWorkBranches(db, repo.path, repo.id, branchName);
       const branch = String(body.branch ?? "").trim();
-      if (branch) {
-        try {
-          await mergeRequirementIntoBranch(db, repo.path, repo.id, branchName, branch);
-        } catch (error) {
+      let mergeNote = "";
+      try {
+        await mergeWorkBranches(db, repo.path, repo.id, branchName);
+        if (branch) await mergeRequirementIntoBranch(db, repo.path, repo.id, branchName, branch);
+      } catch (error) {
+        if (!(error instanceof UnmatchedWorkBranchError)) {
           const message = error instanceof Error ? error.message : "合并失败";
+          console.error(`核对通过未合并：${message}`);
           throw new GateError(409, message);
         }
+        mergeNote = branch ? `${error.message}选择的「${branch}」没有写入。` : error.message;
+        console.error(`核对通过未合并：${mergeNote}`);
       }
       const view = acknowledge(db, String(body.sliceId ?? ""));
       publish(repo.id, status.branch);
-      sendJson(res, 200, view);
+      sendJson(res, 200, mergeNote ? { ...view, mergeNote } : view);
       return;
     }
     if (req.method === "POST" && rest === "gate/reject") {

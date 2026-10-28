@@ -147,6 +147,7 @@ test("当前开发分支对应这次会话", () => {
     "dev/c39dda955a2742ce",
   );
   assert.equal(currentSessionId(db, "repo", "dev/c39dda955a2742ce"), "c39dda95-5a27-42ce-9123-194b6979821f");
+  assert.equal(currentSessionId(db, "repo", "feature-api"), "");
 });
 
 test("历史会话单独保留解释，不会串到当前会话", async () => {
@@ -169,6 +170,8 @@ test("历史会话单独保留解释，不会串到当前会话", async () => {
   const listed = listWorkSessions(db, "repo", "dev/new");
   assert.equal(listed.find((item) => item.sessionId === "old-session")?.current, false);
   assert.equal(listed.find((item) => item.sessionId === "new-session")?.current, true);
+  assert.equal(currentSessionId(db, "repo", "feature-api"), "");
+  assert.equal(currentSessionId(db, "repo", "dev/new"), "new-session");
   assert.deepEqual(readSessionBranches(db, "repo", "old-session"), { requirement: "req/old", development: "dev/old" });
   saveTurns(db, "repo", "old-session", [{ role: "assistant", content: "历史会话里的解释" }]);
   saveTurns(db, "repo", "new-session", [{ role: "assistant", content: "当前会话里的解释" }]);

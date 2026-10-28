@@ -379,12 +379,12 @@ function renderSummary(gate) {
     const picker = renderBranchPicker(typingBranch, branchCaret, "选择分支");
     decisions.append(picker);
     decisions.append(decision("核验通过", () => verify(slice.sliceId, picker.querySelector("select"))));
-    void fillBranches(picker.querySelector("select")).catch(showError);
+    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError);
   } else if (gate.phase === "requirement") {
     const picker = renderBranchPicker(typingBranch, branchCaret, "合并目标");
     decisions.append(picker);
     decisions.append(decision("需求准入", () => admit(slice.sliceId, picker.querySelector("select"))));
-    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError)
+    void fillBranches(picker.querySelector("select"), gate.mergeTarget || "").catch(showError);
   } else {
     decisions.append(decision("放行", () => act("release", slice.sliceId)));
   }
@@ -532,7 +532,7 @@ async function verify(sliceId, select) {
       showNotice("请选择要合并过去的分支。");
       return;
     }
-    await api(`/repos/${state.repoId}/gate/ack`, {
+    const result = await api(`/repos/${state.repoId}/gate/ack`, {
       method: "POST",
       body: JSON.stringify({ sliceId, branch }),
     });
@@ -540,6 +540,7 @@ async function verify(sliceId, select) {
     state.branchChoice = "";
     state.branchQuery = "";
     await refresh();
+    if (result.mergeNote) showNotice(result.mergeNote);
   } finally {
     verifying = false;
     if (select.isConnected) {
