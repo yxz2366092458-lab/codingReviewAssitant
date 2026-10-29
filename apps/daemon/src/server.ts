@@ -33,7 +33,7 @@ import {
 } from "./session/store.ts";
 import { checkoutBranch, listLocalBranches } from "./branches.ts";
 import { chooseFolder } from "./pick-folder.ts";
-import { readFinalRound, setFinalRound } from "./round.ts";
+import { advancePlanStep, applyIntent, codingPlanSnapshot, displayFinalRound, reportFromBody, saveCodingPlan } from "./round.ts";
 import { summarizeFile } from "./summary.ts";
 import { summarizeDiff } from "./summary-ai.ts";
 import { openPanel } from "./panel.ts";
@@ -233,15 +233,27 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "GET" && rest === "gate") {
-      sendJson(res, 200, present(gateView(db, repo.id)));
+      sendJson(res, 200, present(gateView(db, repo.id), repo.id));
+      return;
+    }
+    if (req.method === "POST" && rest === "gate/plan") {
+      const body = await readJson(req);
+      const steps = Array.isArray(body.steps) ? body.steps.map((item) => String(item)) : [];
+      try {
+        const plan = saveCodingPlan(db, repo.id, steps);
+        publish(repo.id);
+        sendJson(res, 200, plan);
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : "coding 计划无效" });
+      }
       return;
     }
     if (req.method === "POST" && rest === "gate/intent") {
       const body = await readJson(req);
       const view = intend(db, repo.id, String(body.agent ?? "agent"), String(body.purpose ?? ""));
-      if (typeof body.final === "boolean" && view.slice) setFinalRound(db, view.slice.sliceId, body.final);
+      const decision = view.slice ? applyIntent(db, repo.id, view.slice.sliceId, reportFromBody(body)) : null;
       publish(repo.id);
-      sendJson(res, 200, present(view));
+      sendJson(res, 200, { ...present(view, repo.id), finalCorrected: decision?.corrected ?? false });
       return;
     }
     if (req.method === "GET" && rest === "gate/wait") {
@@ -273,9 +285,11 @@ export async function startServer(options: { repoPath: string; open?: boolean })
       return;
     }
     if (req.method === "POST" && rest === "gate/complete") {
+      const before = gateView(db, repo.id);
       await complete(db, repo.path, repo.id);
+      if (before.slice?.sliceId) advancePlanStep(db, repo.id, before.slice.sliceId);
       publish(repo.id);
-      sendJson(res, 200, present(gateView(db, repo.id)));
+      sendJson(res, 200, present(gateView(db, repo.id), repo.id));
       return;
     }
     if (req.method === "POST" && rest === "gate/check") {
@@ -322,9 +336,13 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     sendJson(res, 404, { error: "没有这个地址" });
   }
 
-  function present(view: ReturnType<typeof gateView>) {
+  function present(view: ReturnType<typeof gateView>, repoId: string) {
     const sliceId = view.slice?.sliceId ?? null;
-    return { ...view, finalRound: sliceId ? readFinalRound(db, sliceId) : null };
+    return {
+      ...view,
+      finalRound: sliceId ? displayFinalRound(db, repoId, sliceId) : null,
+      codingPlan: codingPlanSnapshot(db, repoId, sliceId),
+    };
   }
 
   async function registerRepo(inputPath: string): Promise<{ repoId: string; branch: string; baseRef: string }> {
@@ -411,7 +429,7 @@ export async function startServer(options: { repoPath: string; open?: boolean })
     const send = () => {
       const row = sliceId ? findSlice(db, sliceId) : null;
       if (!row || (row.state !== "approved" && row.state !== "rejected")) return false;
-      sendJson(res, 200, { state: row.state, finalRound: readFinalRound(db, row.id) });
+      sendJson(res, 200, { state: row.state, finalRound: displayFinalRound(db, String(row.repo_id ?? ""), row.id) });
       return true;
     };
     if (send()) return Promise.resolve();

@@ -191,6 +191,7 @@ async function refresh() {
     lease: gate.lease,
     purpose: gate.slice?.purpose,
     finalRound: gate.finalRound,
+    codingPlan: gate.codingPlan,
     files: (diff.files ?? []).map((file) => `${file.fileId}:${file.summary ?? ""}`),
     scope: state.scope,
     mode: state.mode,
@@ -223,6 +224,10 @@ function renderSummary(gate) {
   const slice = gate.slice;
   $("meta").textContent = slice ? `${slice.agent} · ${slice.createdAt.slice(11, 16)}` : "";
   $("purpose").textContent = slice?.purpose ?? "等待 Agent 登记这一小段的作用。";
+  const plan = $("plan-label");
+  const planText = planLabel(gate.codingPlan);
+  plan.hidden = !planText;
+  plan.textContent = planText;
   const round = $("round-label");
   round.hidden = gate.finalRound !== true && gate.finalRound !== false;
   round.textContent = gate.finalRound === true ? "最后一轮" : gate.finalRound === false ? "不是最后一轮" : "";
@@ -243,6 +248,14 @@ function renderSummary(gate) {
     : slice.mismatch
       ? "提交说明和作用说明不一致。核对或退回后才能开始下一段。"
       : "";
+}
+
+function planLabel(plan) {
+  if (!plan || !plan.total) return "";
+  const step = plan.sliceStep ?? plan.current;
+  if (!step) return plan.completed >= plan.total ? `计划 ${plan.total}/${plan.total} 已完成` : "";
+  const name = plan.steps?.[step - 1] ?? "";
+  return name ? `计划 ${step}/${plan.total}：${name}` : `计划 ${step}/${plan.total}`;
 }
 
 function decision(label, onClick) {
