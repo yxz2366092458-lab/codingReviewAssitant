@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "node .cursor/hooks/coding-plan.mjs" }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/hooks/coding-plan.mjs",
+        "matcher": "review-gate"
+      }
+    ]
+  }
+}

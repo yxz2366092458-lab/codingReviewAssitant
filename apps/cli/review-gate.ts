@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { parseIntendArgs, parsePlanSteps } from "./args.ts";
 
 const home = process.env.REVIEW_HOME ?? join(homedir(), "Library/Application Support/CodingReviewAssistant");
 const infoPath = join(home, "daemon.json");
@@ -28,15 +29,42 @@ if (command === "check-tool") {
   process.exit(denied ? 2 : 0);
 }
 
+if (command === "plan") {
+  const steps = parsePlanSteps(rest);
+  if (steps.length === 0) {
+    process.stderr.write("用法：review-gate plan \"步骤一\" \"步骤二\"\n");
+    process.exit(1);
+  }
+  const plan = await call("POST", `/repos/${await repoId()}/gate/plan`, { steps });
+  process.stdout.write(plan.steps.map((step, index) => `${index + 1}. ${step}`).join("\n") + "\n");
+  process.exit(0);
+}
+
 if (command === "intend") {
-  const final = rest.includes("--final");
-  const purpose = rest.filter((part) => part !== "--final").join(" ").trim();
+  let parsed;
+  try {
+    parsed = parseIntendArgs(rest);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : "参数错误"}\n`);
+    process.exit(1);
+  }
   const view = await call("POST", `/repos/${await repoId()}/gate/intent`, {
     agent: process.env.REVIEW_AGENT ?? "agent",
-    purpose,
-    final,
+    purpose: parsed.purpose,
+    final: parsed.final,
+    ...(parsed.step == null ? {} : { step: parsed.step }),
   });
-  process.stdout.write(`${view.slice?.sliceId ?? ""}\n${view.state}\n`);
+  const lines = [view.slice?.sliceId ?? "", view.state];
+  if (view.finalRound === true) lines.push("最后一轮");
+  else if (view.finalRound === false) lines.push("不是最后一轮");
+  process.stdout.write(`${lines.join("\n")}\n`);
+  if (!view.codingPlan && view.finalRound === false) {
+    process.stderr.write("还没有 coding 计划，本轮不能标成最后一轮。请先执行 review-gate plan \"步骤一\" \"步骤二\"。\n");
+  } else if (view.finalCorrected) {
+    process.stderr.write(view.finalRound === true
+      ? "已按 coding 计划纠正：这一轮是最后一轮。\n"
+      : "已按 coding 计划纠正：计划还没完成，这一轮不是最后一轮。\n");
+  }
   process.exit(0);
 }
 
@@ -61,7 +89,7 @@ if (command === "complete") {
   process.exit(1);
 }
 
-process.stderr.write("用法：review-gate intend \"作用\" [--final] | wait | complete | check-tool\n");
+process.stderr.write("用法：review-gate plan \"步骤一\" \"步骤二\" | intend \"作用\" [--step N] [--final] | wait | complete | check-tool\n");
 process.exit(1);
 
 async function repoId() {
